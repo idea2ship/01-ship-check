@@ -1,0 +1,55 @@
+# /1> Ship Check — systemd unit
+#
+# Install: sudo cp deploy/ship-check.service /etc/systemd/system/
+#          sudo systemctl daemon-reload
+#          sudo systemctl enable --now ship-check
+#
+# Logs:    sudo journalctl -u ship-check -f
+# Restart: sudo systemctl restart ship-check
+
+[Unit]
+Description=/1> Ship Check (Next.js)
+Documentation=https://github.com/idea2ship/01-ship-check
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+
+# App location on the VM
+WorkingDirectory=/home/ubuntu/01-ship-check
+
+# Env vars loaded from a file outside the repo (chmod 600).
+# Contents: same keys as .env.local (GROQ_API_KEY, SUPABASE_URL, …)
+EnvironmentFile=/home/ubuntu/01-ship-check/.env.local
+
+# Use pnpm via the nvm-installed Node. Adjust path if you use a different
+# Node installer (system apt, fnm, asdf, etc.).
+Environment=PATH=/home/ubuntu/.nvm/versions/node/v22.15.0/bin:/usr/local/bin:/usr/bin:/bin
+Environment=NODE_ENV=production
+Environment=PORT=3000
+
+ExecStart=/home/ubuntu/.nvm/versions/node/v22.15.0/bin/pnpm start
+
+# Restart on crash with backoff
+Restart=on-failure
+RestartSec=5
+
+# Resource hygiene
+LimitNOFILE=65536
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=read-only
+PrivateTmp=true
+
+# Logs go to journald (already default, but explicit is nice)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ship-check
+
+[Install]
+WantedBy=multi-user.target

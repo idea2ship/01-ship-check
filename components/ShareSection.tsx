@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
 import { CopyButton } from './CopyButton';
@@ -14,7 +15,7 @@ type Props = {
   getMarkdown: () => string;
   saveState: SaveState;
   savedId: string | null;
-  /** Pass true when the user clicked "동의하고 공유하기" (content-use OK). */
+  /** Pass the content-use consent state captured from the checkbox. */
   onSave: (allowContentUse: boolean) => void;
 };
 
@@ -65,6 +66,8 @@ export function ShareSection({
   savedId,
   onSave,
 }: Props) {
+  const [allowContentUse, setAllowContentUse] = useState(false);
+
   const shareUrl =
     typeof window !== 'undefined' && savedId
       ? `${window.location.origin}/r/${savedId}`
@@ -121,10 +124,37 @@ export function ShareSection({
             transition={transition}
             className="space-y-3"
           >
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-ink/10 bg-white/70 px-3 py-2.5 text-[12px] leading-snug text-ink/80 transition hover:border-ink/20">
+              <input
+                type="checkbox"
+                checked={allowContentUse}
+                onChange={(e) => setAllowContentUse(e.target.checked)}
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer accent-ink"
+              />
+              <span>
+                평가 결과를 익명 통계와 콘텐츠 개선에 활용하는 데 동의합니다.{' '}
+                <Link
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="underline underline-offset-2 hover:text-ink"
+                >
+                  자세히 보기 ↗
+                </Link>
+              </span>
+            </label>
+
             <div className="grid gap-2 sm:grid-cols-2">
+              <CopyButton
+                getText={getMarkdown}
+                label="📋 결과 복사"
+                copiedLabel="✓ Copied"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-ink/15 bg-white px-5 py-3 text-sm font-semibold text-ink/85 transition hover:border-ink/30 hover:bg-white"
+              />
               <button
                 type="button"
-                onClick={() => onSave(true)}
+                onClick={() => onSave(allowContentUse)}
                 disabled={saving}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-ink px-5 py-3 text-sm font-semibold text-cream transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-70"
               >
@@ -135,40 +165,11 @@ export function ShareSection({
                   </>
                 ) : (
                   <>
-                    <span>동의하고 공유하기</span>
+                    <span>익명 저장</span>
                     <span aria-hidden>→</span>
                   </>
                 )}
               </button>
-              <button
-                type="button"
-                onClick={() => onSave(false)}
-                disabled={saving}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-ink/15 bg-white px-5 py-3 text-sm font-semibold text-ink/85 transition hover:border-ink/30 hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                저장하기
-              </button>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-ink/55">
-              <button
-                type="button"
-                onClick={() => {
-                  void navigator.clipboard?.writeText(getMarkdown());
-                }}
-                className="inline-flex items-center gap-1.5 underline-offset-2 transition hover:text-ink hover:underline"
-              >
-                <span aria-hidden>📋</span>
-                <span>저장 없이 결과만 복사</span>
-              </button>
-              <Link
-                href="/privacy"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-2 hover:text-ink"
-              >
-                자세히 보기 ↗
-              </Link>
             </div>
           </motion.div>
         )}

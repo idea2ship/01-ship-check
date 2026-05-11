@@ -1,0 +1,46 @@
+# /1> Ship Check — Caddy config
+#
+# Caddy handles automatic HTTPS via Let's Encrypt. Port 80 redirects to 443.
+# The Next.js app runs on 127.0.0.1:3000 via systemd (ship-check.service).
+#
+# Install: /etc/caddy/Caddyfile (or include from there).
+# Reload:  sudo systemctl reload caddy
+
+01.idea2ship.xyz {
+	# Reverse proxy to the Next.js app
+	reverse_proxy 127.0.0.1:3000
+
+	# Compress everything
+	encode zstd gzip
+
+	# Security headers
+	header {
+		# HSTS — preload after we're confident on cert
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		# Prevent MIME sniffing
+		X-Content-Type-Options "nosniff"
+		# Frame ancestors — block clickjacking
+		X-Frame-Options "SAMEORIGIN"
+		# Referrer policy
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Permissions policy — disable sensors we don't use
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+		# Remove the default Server header
+		-Server
+	}
+
+	# Long cache for static assets (Next.js handles content-hashing)
+	@static path /_next/static/* /bg-landscape.png /bg-portrait.png
+	header @static Cache-Control "public, max-age=31536000, immutable"
+
+	# Log access to journald
+	log {
+		output stdout
+		format console
+	}
+}
+
+# Redirect www and apex to the primary subdomain (optional — uncomment when wanted)
+# www.idea2ship.xyz, idea2ship.xyz {
+# 	redir https://01.idea2ship.xyz{uri} permanent
+# }
