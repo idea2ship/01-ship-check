@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import { IDEA_MAX, SUCCESS_MAX } from '@/lib/validation';
 
 type Props = {
@@ -21,6 +22,35 @@ export function IdeaForm({
   onSuccessChange,
   onSubmit,
 }: Props) {
+  const successRef = useRef<HTMLTextAreaElement>(null);
+
+  // The Enter that commits a Hangul/Japanese/Chinese IME composition also
+  // fires keydown — if we hijacked it the just-committed character would
+  // get re-emitted into the next textarea after focus moved. Skip while
+  // composing so that first Enter just commits the IME, and a second Enter
+  // (after composition is done) actually advances focus.
+  const isImeComposing = (e: React.KeyboardEvent<HTMLTextAreaElement>) =>
+    e.nativeEvent.isComposing || e.keyCode === 229;
+
+  // Plain Enter in idea textarea jumps to success metric.
+  // Shift+Enter (or any modifier) preserves a newline for free-form writing.
+  const handleIdeaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (isImeComposing(e)) return;
+    if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      successRef.current?.focus();
+    }
+  };
+
+  // Plain Enter in success metric submits.
+  const handleSuccessKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (isImeComposing(e)) return;
+    if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      if (!loading) onSubmit();
+    }
+  };
+
   return (
     <form
       onSubmit={(e) => {
@@ -40,11 +70,15 @@ export function IdeaForm({
             id="idea"
             value={idea}
             onChange={(e) => onIdeaChange(e.target.value)}
+            onKeyDown={handleIdeaKeyDown}
             placeholder="예: 학생들이 수업 공지를 확인할 때 마감일과 제출서류를 놓치는 문제를, 신청할 일만 카드로 정리해서 해결한다."
             rows={6}
             maxLength={IDEA_MAX}
             className="w-full resize-none rounded-lg border border-white/70 bg-white/85 p-4 text-sm leading-relaxed text-ink shadow-inner placeholder:text-ink/45 backdrop-blur-sm focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/15"
           />
+          <p className="text-[11px] text-ink/55">
+            Enter로 다음 항목, Shift+Enter로 줄바꿈
+          </p>
         </div>
 
         <div className="relative z-10 flex flex-col gap-3">
@@ -61,8 +95,10 @@ export function IdeaForm({
           </div>
           <textarea
             id="success"
+            ref={successRef}
             value={successCriteria}
             onChange={(e) => onSuccessChange(e.target.value)}
+            onKeyDown={handleSuccessKeyDown}
             placeholder="1주일 후 무엇이 일어나면 성공인가요?"
             rows={2}
             maxLength={SUCCESS_MAX}

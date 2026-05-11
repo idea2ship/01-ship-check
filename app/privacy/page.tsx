@@ -57,6 +57,22 @@ export default function PrivacyPage() {
           </section>
 
           <section>
+            <h2 className="mb-2 text-base font-medium">공유 링크</h2>
+            <p className="text-muted">
+              저장에 동의하면 결과를 다시 볼 수 있는 비공개 URL이
+              생성됩니다 (`/r/&lt;고유ID&gt;` 형태). 이 링크는 검색 엔진에
+              노출되지 않으며, 추측이 사실상 불가능한 UUID로 만들어집니다.
+              링크를 가진 사람만 결과를 열람할 수 있고, 본인이 직접
+              공유하지 않으면 외부에 노출되지 않습니다.
+            </p>
+            <p className="mt-2 text-muted">
+              링크 페이지에는 입력하신 아이디어 본문, 성공 기준, AI 평가
+              결과가 표시됩니다. 이름·이메일·로그인 정보 등 본인을 식별할
+              수 있는 정보는 포함되지 않습니다.
+            </p>
+          </section>
+
+          <section>
             <h2 className="mb-2 text-base font-medium">보유 기간</h2>
             <p className="text-muted">
               선택 저장 데이터는 최대 6개월 보관 후 삭제하는 것을 원칙으로

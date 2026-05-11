@@ -19,12 +19,16 @@ export async function POST(req: Request) {
     result,
     allowAnonymousStorage,
     allowContentUse,
+    conceptImageUrl,
+    conceptImagePrompt,
   } = (body ?? {}) as {
     idea?: unknown;
     successCriteria?: unknown;
     result?: unknown;
     allowAnonymousStorage?: unknown;
     allowContentUse?: unknown;
+    conceptImageUrl?: unknown;
+    conceptImagePrompt?: unknown;
   };
 
   if (allowAnonymousStorage !== true) {
@@ -59,6 +63,12 @@ export async function POST(req: Request) {
     next_actions: result.nextActions,
     allow_anonymous_storage: true,
     allow_content_use: allowContentUse === true,
+    concept_image_url:
+      typeof conceptImageUrl === 'string' && conceptImageUrl.startsWith('http')
+        ? conceptImageUrl
+        : null,
+    concept_image_prompt:
+      typeof conceptImagePrompt === 'string' ? conceptImagePrompt : null,
   };
 
   try {

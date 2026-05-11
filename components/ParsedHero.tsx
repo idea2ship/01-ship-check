@@ -1,5 +1,6 @@
 'use client';
 
+import { eulReul } from '@/lib/validation';
 import type { ParsedIdea } from '@/lib/types';
 
 type Props = {
@@ -14,19 +15,32 @@ function Chip({
   value: string | null | undefined;
   fallback: string;
 }) {
-  const display = value && value.length > 0 ? value : fallback;
+  const text = value && value.length > 0 ? value : null;
+  const display = text ?? fallback;
+  const filled = text !== null;
   return (
     <span
       key={display}
-      className="animate-fade-in inline-block bg-mint-soft px-1.5 leading-snug"
+      className={`animate-type-in inline-block min-w-0 max-w-full shrink truncate px-1.5 leading-snug transition-colors ${
+        filled
+          ? 'bg-mint-soft text-ink'
+          : 'bg-ink/[0.08] text-ink/55'
+      }`}
+      title={display}
     >
       {display}
     </span>
   );
 }
 
+function Suffix({ children }: { children: React.ReactNode }) {
+  return <span className="shrink-0 text-ink/85">{children}</span>;
+}
+
 export function ParsedHero({ parsedIdea, parsing }: Props) {
   const ending = parsedIdea?.isComplete ? '해결합니다.' : '해결할까요?';
+  const problemText = parsedIdea?.problem ?? '어떤 문제';
+  const problemParticle = eulReul(problemText);
 
   return (
     <section className="text-glow">
@@ -39,21 +53,25 @@ export function ParsedHero({ parsedIdea, parsing }: Props) {
         />
       </div>
 
-      <div className="space-y-5 text-3xl font-black leading-[1.3] tracking-tight sm:text-4xl lg:space-y-6 lg:text-5xl xl:text-6xl">
-        <div className="slot-row">
+      <div className="space-y-5 text-3xl font-black leading-[1.3] tracking-tight sm:text-4xl lg:space-y-6 lg:text-5xl">
+        <div className="slot-row flex animate-row-rise items-baseline">
           <Chip value={parsedIdea?.actor} fallback="누가" />
         </div>
-        <div className="slot-row">
-          <Chip value={parsedIdea?.situation} fallback="어떤 상황에서" />{' '}
-          <span>겪는</span>
+        <div className="slot-row flex animate-row-rise items-baseline gap-2 [animation-delay:60ms]">
+          <Chip value={parsedIdea?.situation} fallback="어떤 상황에서" />
+          <Suffix>겪는</Suffix>
         </div>
-        <div className="slot-row">
+        <div className="slot-row flex animate-row-rise items-baseline [animation-delay:120ms]">
           <Chip value={parsedIdea?.problem} fallback="어떤 문제" />
-          <span>를</span>
+          <Suffix>
+            <span key={problemParticle} className="animate-fade-in">
+              {problemParticle}
+            </span>
+          </Suffix>
         </div>
-        <div className="slot-row is-last">
-          <Chip value={parsedIdea?.solution} fallback="어떻게" />{' '}
-          <span>{ending}</span>
+        <div className="slot-row flex animate-row-rise items-baseline gap-2 [animation-delay:180ms]">
+          <Chip value={parsedIdea?.solution} fallback="어떻게" />
+          <Suffix>{ending}</Suffix>
         </div>
       </div>
 

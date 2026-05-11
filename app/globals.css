@@ -11,30 +11,70 @@ html {
   background-color: #faf7f0;
 }
 
-/* The background image lives directly on <body> so there's no z-index
-   stacking dance between a bg-layer div and the page content. */
 body {
   color: #1a1a1a;
-  background-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'ss01', 'cv11';
+}
+
+/* The background image lives on a fixed-position div that extends 150px
+   beyond the viewport on every side. cover-fits within that oversized box,
+   so even with cursor parallax (±60px) and drift animation the viewport is
+   always fully inside the image — no cream edges peek through.
+
+   No explicit z-index: a fixed positioned element with z-index: auto paints
+   below subsequent positioned siblings (main is `position: relative`) in
+   the same stacking level. */
+.bg-layer {
+  position: fixed;
+  inset: -150px;
+  background-color: #faf7f0;
   background-image: url('/bg-portrait.png');
   background-size: cover;
   background-position: 50% 50%;
   background-repeat: no-repeat;
-  background-attachment: fixed;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: 'ss01', 'cv11';
+  pointer-events: none;
   animation: bg-drift 28s ease-in-out infinite;
+  /* Soften the image so the slot text and the form card read first.
+     The html cream shows through the missing portion. */
+  opacity: 0.55;
 }
 
 @media (min-width: 1024px) {
-  body {
+  .bg-layer {
     background-image: url('/bg-landscape.png');
   }
 }
 
-/* Slow infinite drift on background-position only — no transform, no
-   stacking context surprises. */
+/* Cream gradient overlay for readability. Stronger on the hero side
+   (left on desktop, top on mobile) where the slot text sits, weaker
+   over the form where glassmorphism already softens the bg. */
+.bg-veil {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(250, 247, 240, 0.55) 0%,
+    rgba(250, 247, 240, 0.32) 45%,
+    rgba(250, 247, 240, 0.12) 80%,
+    rgba(250, 247, 240, 0.05) 100%
+  );
+}
+
+@media (min-width: 1024px) {
+  .bg-veil {
+    background: linear-gradient(
+      105deg,
+      rgba(250, 247, 240, 0.6) 0%,
+      rgba(250, 247, 240, 0.38) 38%,
+      rgba(250, 247, 240, 0.14) 65%,
+      rgba(250, 247, 240, 0.04) 100%
+    );
+  }
+}
+
 @keyframes bg-drift {
   0%,
   100% {
@@ -51,20 +91,20 @@ body {
   }
 }
 
-/* When the BgLayer effect detects pointer movement it sets these vars on
-   <body>. The drift animation must be fully removed (not just paused) so
-   the static calc() can override it. animation-play-state: paused freezes
-   the animated value, which still wins the cascade. */
-body.is-cursor-active {
+/* On cursor activity the drift is fully removed so the static calc() can
+   take effect. animation-play-state: paused would freeze the animated
+   value and the calc() would never win the cascade. */
+.bg-layer.is-cursor-active {
   animation: none;
   background-position:
     calc(50% + var(--cursor-x, 0px))
     calc(50% + var(--cursor-y, 0px));
-  transition: background-position 180ms ease-out;
+  /* No CSS transition — BgLayer.tsx runs a per-frame lerp so the bg always
+     glides smoothly, even on a fresh re-entry from outside the viewport. */
 }
 
 @media (prefers-reduced-motion: reduce) {
-  body {
+  .bg-layer {
     animation: none;
   }
 }
@@ -75,15 +115,13 @@ body.is-cursor-active {
   color: #1a1a1a;
 }
 
-/* ---- Slot row underline + plus marker ---- */
+/* ---- Slot row underline + plus marker ----
+   All four slot rows share the same dotted underline + "+" marker so the
+   visual rhythm stays consistent down to the last row. */
 .slot-row {
   position: relative;
   padding-bottom: 0.5rem;
   border-bottom: 2px dotted rgba(26, 26, 26, 0.18);
-}
-
-.slot-row.is-last {
-  border-bottom-color: transparent;
 }
 
 .slot-row::after {
@@ -104,11 +142,33 @@ body.is-cursor-active {
     0 0 36px rgba(255, 255, 255, 0.55);
 }
 
-/* ---- Slot fade-in ---- */
-@keyframes fade-in {
+/* ---- Slot chip typing reveal (left → right) ---- */
+@keyframes type-in {
+  0% {
+    clip-path: inset(0 100% 0 0);
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-type-in {
+  animation: type-in 460ms cubic-bezier(0.6, 0, 0.2, 1) both;
+  will-change: clip-path, opacity, transform;
+}
+
+/* Optional: subtle row slide-up on first paint */
+@keyframes row-rise {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -116,12 +176,38 @@ body.is-cursor-active {
   }
 }
 
-.animate-fade-in {
-  animation: fade-in 320ms ease-out both;
+.animate-row-rise {
+  animation: row-rise 520ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-fade-in {
+  .animate-type-in,
+  .animate-row-rise {
+    animation: none;
+  }
+}
+
+/* Older alias, still referenced in some places — keep working. */
+.animate-fade-in {
+  animation: type-in 460ms cubic-bezier(0.6, 0, 0.2, 1) both;
+}
+
+/* ---- Skeleton shimmer ---- */
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-shimmer {
     animation: none;
   }
 }

@@ -28,3 +28,8 @@ alter table ship_check_ideas enable row level security;
 
 create index if not exists ship_check_ideas_created_at_idx
   on ship_check_ideas (created_at desc);
+
+-- Migration: concept image (idempotent — safe to re-run)
+alter table ship_check_ideas
+  add column if not exists concept_image_url text,
+  add column if not exists concept_image_prompt text;

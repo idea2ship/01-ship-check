@@ -22,6 +22,12 @@ export type EvaluationResult = {
   improvedSuccessMetric: string;
   risks: string[];
   nextActions: string[];
+  /**
+   * Short English visual description of the service concept. The brand
+   * style suffix (cream bg, mint accent, no text, etc.) is appended by
+   * `lib/image.ts` — the LLM only writes the concept itself.
+   */
+  imagePrompt: string;
 };
 
 export type ParsedField = 'actor' | 'situation' | 'problem' | 'solution';

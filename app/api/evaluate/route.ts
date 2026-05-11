@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { evaluateIdea, GeminiError } from '@/lib/gemini';
+import { evaluateIdea, LLMError } from '@/lib/llm';
 import { normalizeParsedIdea, validateInput } from '@/lib/validation';
 
 export const runtime = 'nodejs';
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     );
     return NextResponse.json(result, { status: 200 });
   } catch (err) {
-    if (err instanceof GeminiError) {
+    if (err instanceof LLMError) {
       const status =
         err.kind === 'CONFIG' ? 500 : err.kind === 'PARSE_FAILED' ? 502 : 503;
       return NextResponse.json({ error: err.kind }, { status });

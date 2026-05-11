@@ -4,9 +4,21 @@ import { useState } from 'react';
 
 type Props = {
   getText: () => string;
+  label?: string;
+  copiedLabel?: string;
+  errorLabel?: string;
+  icon?: React.ReactNode;
+  className?: string;
 };
 
-export function CopyButton({ getText }: Props) {
+export function CopyButton({
+  getText,
+  label = 'Copy result',
+  copiedLabel = 'Copied',
+  errorLabel = 'Copy failed',
+  icon,
+  className,
+}: Props) {
   const [state, setState] = useState<'idle' | 'copied' | 'error'>('idle');
 
   async function handleCopy() {
@@ -31,17 +43,24 @@ export function CopyButton({ getText }: Props) {
     setTimeout(() => setState('idle'), 1800);
   }
 
+  const display =
+    state === 'copied'
+      ? copiedLabel
+      : state === 'error'
+        ? errorLabel
+        : label;
+
   return (
     <button
       type="button"
       onClick={handleCopy}
-      className="inline-flex items-center gap-2 rounded-2xl border border-border-soft bg-white px-4 py-2 text-sm text-ink transition hover:border-mint hover:bg-mint-soft/40"
+      className={
+        className ??
+        'inline-flex items-center gap-2 rounded-2xl border border-border-soft bg-white px-4 py-2 text-sm text-ink transition hover:border-mint hover:bg-mint-soft/40'
+      }
     >
-      {state === 'copied'
-        ? 'Copied'
-        : state === 'error'
-          ? 'Copy failed'
-          : 'Copy result'}
+      {icon}
+      <span>{display}</span>
     </button>
   );
 }
