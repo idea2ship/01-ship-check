@@ -1,35 +1,3 @@
-export type ScoreReview = {
-  score: number;
-  comment: string;
-};
-
-export type MvpScopeReview = {
-  score: number;
-  comment: string;
-  shouldCut: string[];
-};
-
-export type FirstFeature = {
-  title: string;
-  description: string;
-};
-
-export type EvaluationResult = {
-  summary: string;
-  clarityReview: ScoreReview;
-  mvpScope: MvpScopeReview;
-  firstFeature: FirstFeature;
-  improvedSuccessMetric: string;
-  risks: string[];
-  nextActions: string[];
-  /**
-   * Short English visual description of the service concept. The brand
-   * style suffix (cream bg, mint accent, no text, etc.) is appended by
-   * `lib/image.ts` — the LLM only writes the concept itself.
-   */
-  imagePrompt: string;
-};
-
 export type ParsedField = 'actor' | 'situation' | 'problem' | 'solution';
 
 export type ParsedIdea = {
@@ -45,6 +13,52 @@ export type ParsedIdea = {
 
 export type ParseRequest = {
   idea: string;
+};
+
+export type ShipTypeKey =
+  | 'ready_shipper'
+  | 'scope_down_shipper'
+  | 'big_vision'
+  | 'foggy_idea'
+  | 'discovery_mode';
+
+export type ShipType = {
+  /** Stable categorical key for analytics/styling */
+  key: ShipTypeKey;
+  /** Korean display name, e.g. "조건부 출시형" */
+  name: string;
+  /** English display name, e.g. "Scope-Down Shipper" */
+  nameEn: string;
+  /** Short reason this idea ended up in this category (≤60 chars) */
+  blurb: string;
+  /** Whether the banner "Can Ship in 1 Week" is shown */
+  canShipInWeek: boolean;
+};
+
+export type EvaluationScores = {
+  clarity: number; // 1~5
+  mvpScope: number; // 1~5
+  feasibility: number; // 1~5
+};
+
+export type MvpStrategy = {
+  /** What to keep in the 1-week MVP (≤3 items, each ≤22 chars) */
+  keep: string[];
+  /** What to cut out (≤3 items, each ≤22 chars) */
+  cut: string[];
+};
+
+export type EvaluationResult = {
+  /** One-sentence headline, kept for OG card description + MD export */
+  summary: string;
+  shipType: ShipType;
+  /** Overall confidence score, 0~100 integer */
+  confidence: number;
+  scores: EvaluationScores;
+  mvpStrategy: MvpStrategy;
+  nextActions: string[]; // exactly 3, each ≤25 chars, verb-start
+  /** English prompt for concept image generation (no brand tokens — added in lib/image.ts) */
+  imagePrompt: string;
 };
 
 export type EvaluateRequest = {

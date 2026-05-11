@@ -5,40 +5,63 @@ import { useEffect, useState } from 'react';
 type Props = {
   url: string;
   alt?: string;
-  /** Tailwind aspect class. Defaults to square. */
+  /** Tailwind aspect class. Defaults to 16/9 (less tall than the older 4/3). */
   aspect?: string;
 };
 
 /**
  * Renders a Pollinations-generated concept image with a brand-tinted
- * placeholder while it loads, and a soft fallback if generation fails or
- * times out. The image is fetched directly by the browser — no server
- * proxy — so it doesn't burn our Vercel/OCI function quota.
+ * placeholder while it loads. Pollinations free anonymous tier can be slow
+ * (queue + cold gen of 15-45s) or rate-limited (429 with maxAllowed: 1 per
+ * IP), so we keep a generous timeout, show a soft hint while waiting, and
+ * offer a retry on failure.
  */
-export function ConceptImage({ url, alt = 'Concept image', aspect = 'aspect-square' }: Props) {
+export function ConceptImage({
+  url,
+  alt = 'Concept image',
+  aspect = 'aspect-[16/9]',
+}: Props) {
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
+  const [slowHint, setSlowHint] = useState(false);
+  /** Bumping nonce changes <img src> and forces re-fetch. */
+  const [nonce, setNonce] = useState(0);
 
-  // Pollinations sometimes queues requests during peak load. If the image
-  // hasn't responded in 30s we show the fallback instead of hanging
-  // forever.
+  // Show a hint after 8s so the user knows we're not stuck.
+  useEffect(() => {
+    if (loaded || errored || timedOut) return;
+    const t = setTimeout(() => setSlowHint(true), 8_000);
+    return () => clearTimeout(t);
+  }, [loaded, errored, timedOut, nonce]);
+
+  // Hard timeout at 60s.
   useEffect(() => {
     if (loaded || errored) return;
-    const t = setTimeout(() => setTimedOut(true), 30_000);
+    const t = setTimeout(() => setTimedOut(true), 60_000);
     return () => clearTimeout(t);
-  }, [loaded, errored]);
+  }, [loaded, errored, nonce]);
 
   const failed = errored || timedOut;
+  const srcWithNonce = nonce > 0 ? `${url}${url.includes('?') ? '&' : '?'}retry=${nonce}` : url;
+
+  function handleRetry() {
+    setLoaded(false);
+    setErrored(false);
+    setTimedOut(false);
+    setSlowHint(false);
+    setNonce((n) => n + 1);
+  }
 
   return (
     <div
-      className={`relative ${aspect} overflow-hidden rounded-2xl border border-white/60 bg-gradient-to-br from-mint-soft via-cream to-mint-soft/40 shadow-soft`}
+      className={`relative ${aspect} overflow-hidden rounded-2xl border border-white/60 bg-gradient-to-br from-mint-soft via-cream to-mint-soft/40`}
     >
       {!failed ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={url}
+          key={nonce}
+          src={srcWithNonce}
           alt={alt}
           onLoad={() => setLoaded(true)}
           onError={() => setErrored(true)}
@@ -55,12 +78,30 @@ export function ConceptImage({ url, alt = 'Concept image', aspect = 'aspect-squa
         />
       ) : null}
 
-      {failed ? (
+      {!loaded && !failed && slowHint ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
-          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-ink/50">
+          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-ink/55">
+            generating
+          </p>
+          <p className="text-xs text-ink/55">컨셉 이미지를 그리는 중…</p>
+        </div>
+      ) : null}
+
+      {failed ? (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center">
+          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-ink/55">
             concept
           </p>
-          <p className="text-xs text-ink/45">이미지를 불러오지 못했어요</p>
+          <p className="text-xs text-ink/55">
+            이미지 생성이 지연되고 있어요 (Pollinations free tier).
+          </p>
+          <button
+            type="button"
+            onClick={handleRetry}
+            className="mt-1 rounded-full border border-ink/15 bg-white/80 px-3 py-1 text-[11px] font-medium text-ink/75 transition hover:border-ink/30 hover:bg-white"
+          >
+            다시 시도
+          </button>
         </div>
       ) : null}
     </div>

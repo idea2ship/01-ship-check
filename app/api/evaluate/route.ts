@@ -33,7 +33,10 @@ export async function POST(req: Request) {
       successCriteria as string,
       normalizedParsed,
     );
-    return NextResponse.json(result, { status: 200 });
+    return NextResponse.json(result, {
+      status: 200,
+      headers: { 'Cache-Control': 'no-store' },
+    });
   } catch (err) {
     if (err instanceof LLMError) {
       const status =

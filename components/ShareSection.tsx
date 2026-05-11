@@ -12,29 +12,16 @@ type SaveState =
 
 type Props = {
   getMarkdown: () => string;
-  allowContentUse: boolean;
   saveState: SaveState;
   savedId: string | null;
-  onAllowContentUseChange: (value: boolean) => void;
-  onSave: () => void;
+  /** Pass true when the user clicked "동의하고 공유하기" (content-use OK). */
+  onSave: (allowContentUse: boolean) => void;
 };
 
 function Spinner() {
   return (
-    <svg
-      className="h-4 w-4 animate-spin"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden
-    >
-      <circle
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="3"
-        opacity="0.22"
-      />
+    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.22" />
       <path
         d="M12 2a10 10 0 0 1 10 10"
         stroke="currentColor"
@@ -45,7 +32,7 @@ function Spinner() {
   );
 }
 
-function Check() {
+function CheckMark() {
   return (
     <motion.svg
       className="h-4 w-4"
@@ -64,165 +51,137 @@ function Check() {
         strokeLinejoin="round"
         initial={{ pathLength: 0 }}
         animate={{ pathLength: 1 }}
-        transition={{ duration: 0.32, ease: [0.4, 0, 0.2, 1], delay: 0.05 }}
+        transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1], delay: 0.05 }}
       />
     </motion.svg>
   );
 }
 
-const labelTransition = { duration: 0.22, ease: [0.4, 0, 0.2, 1] as const };
+const transition = { duration: 0.28, ease: [0.4, 0, 0.2, 1] as const };
 
 export function ShareSection({
   getMarkdown,
-  allowContentUse,
   saveState,
   savedId,
-  onAllowContentUseChange,
   onSave,
 }: Props) {
-  const saveDisabled =
-    saveState.kind === 'saving' || saveState.kind === 'saved';
+  const shareUrl =
+    typeof window !== 'undefined' && savedId
+      ? `${window.location.origin}/r/${savedId}`
+      : '';
 
-  function getShareUrl(): string {
-    if (typeof window === 'undefined' || !savedId) return '';
-    return `${window.location.origin}/r/${savedId}`;
-  }
+  const saving = saveState.kind === 'saving';
+  const saved = saveState.kind === 'saved';
+  const errored = saveState.kind === 'error';
 
   return (
-    <section className="rounded-2xl border border-border-soft bg-white p-5 shadow-soft sm:p-6">
-      <h3 className="mb-4 text-sm font-medium text-ink">Share result</h3>
-
-      <div className="mb-6 space-y-2">
-        <p className="text-xs text-muted">
-          평가 결과를 클립보드에 복사하거나, 저장 후 생성된 링크를 친구에게
-          보낼 수 있습니다.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <CopyButton getText={getMarkdown} label="Copy result" />
-          {savedId ? (
-            <CopyButton
-              getText={getShareUrl}
-              label="Copy link"
-              copiedLabel="Link copied"
-            />
-          ) : null}
-        </div>
-        {savedId ? (
-          <p className="break-all rounded-xl border border-border-soft bg-cream/40 px-3 py-2 font-mono text-[11px] text-ink/70">
-            {getShareUrl() || `/r/${savedId}`}
-          </p>
-        ) : null}
-      </div>
-
-      <div className="space-y-3 border-t border-border-soft pt-5">
-        <p className="text-xs text-muted">
-          저장 버튼을 누르면 아이디어와 AI 평가 결과가 익명으로 보관됩니다.
-          개인을 식별할 수 있는 정보는 수집하지 않습니다.{' '}
-          <Link
-            href="/privacy"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline underline-offset-2 hover:text-ink"
+    <section className="rounded-2xl border border-white/65 bg-white/55 p-4 shadow-soft backdrop-blur-sm sm:p-5">
+      <AnimatePresence mode="wait" initial={false}>
+        {saved && shareUrl ? (
+          <motion.div
+            key="saved"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={transition}
+            className="space-y-3"
           >
-            저장 정책 보기 ↗
-          </Link>
-        </p>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-mint-strong text-white">
+                <CheckMark />
+              </span>
+              <span className="font-medium text-ink">
+                저장 완료 — 공유 링크가 생성되었어요
+              </span>
+            </div>
+            <div className="break-all rounded-xl border border-ink/10 bg-white/85 px-3 py-2 font-mono text-[11px] text-ink/75">
+              {shareUrl}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <CopyButton
+                getText={() => shareUrl}
+                label="🔗 링크 복사"
+                copiedLabel="✓ Link copied"
+                className="inline-flex items-center gap-2 rounded-2xl bg-mint-strong px-4 py-2 text-sm font-medium text-white transition hover:bg-mint-strong/90"
+              />
+              <CopyButton
+                getText={getMarkdown}
+                label="📋 결과 복사"
+                copiedLabel="✓ Copied"
+                className="inline-flex items-center gap-2 rounded-2xl border border-ink/10 bg-white px-4 py-2 text-sm font-medium text-ink/85 transition hover:border-ink/25"
+              />
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="idle"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={transition}
+            className="space-y-3"
+          >
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => onSave(true)}
+                disabled={saving}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-ink px-5 py-3 text-sm font-semibold text-cream transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {saving ? (
+                  <>
+                    <Spinner />
+                    <span>Saving…</span>
+                  </>
+                ) : (
+                  <>
+                    <span>동의하고 공유하기</span>
+                    <span aria-hidden>→</span>
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => onSave(false)}
+                disabled={saving}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-ink/15 bg-white px-5 py-3 text-sm font-semibold text-ink/85 transition hover:border-ink/30 hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                저장하기
+              </button>
+            </div>
 
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-mint-soft/30 p-3">
-          <input
-            type="checkbox"
-            checked={allowContentUse}
-            onChange={(e) => onAllowContentUseChange(e.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-border-soft text-mint accent-mint focus:ring-mint"
-          />
-          <div className="text-sm">
-            <p className="text-ink">
-              [선택] 콘텐츠 예시 활용에도 동의합니다
-            </p>
-            <p className="mt-1 text-xs text-muted">
-              익명 처리된 아이디어와 평가 결과가 추후 idea2ship 콘텐츠 예시로
-              활용될 수 있습니다. 공개 시 개인을 식별할 수 있는 정보는
-              제거합니다.{' '}
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-ink/55">
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(getMarkdown());
+                }}
+                className="inline-flex items-center gap-1.5 underline-offset-2 transition hover:text-ink hover:underline"
+              >
+                <span aria-hidden>📋</span>
+                <span>저장 없이 결과만 복사</span>
+              </button>
               <Link
                 href="/privacy"
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
                 className="underline underline-offset-2 hover:text-ink"
               >
                 자세히 보기 ↗
               </Link>
-            </p>
-          </div>
-        </label>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        <div className="flex flex-col-reverse items-stretch gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-muted">
-            {saveState.kind === 'saved'
-              ? '저장 완료. 함께해 주셔서 감사합니다.'
-              : '버튼 클릭 = 익명 저장 동의'}
-          </p>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saveDisabled}
-            className={`relative inline-flex min-w-[160px] items-center justify-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed ${
-              saveState.kind === 'saved'
-                ? 'bg-mint-strong text-white'
-                : saveDisabled
-                  ? 'bg-mint/70 text-ink'
-                  : 'bg-mint text-ink hover:bg-mint/90'
-            }`}
-          >
-            <AnimatePresence mode="wait" initial={false}>
-              {saveState.kind === 'saving' ? (
-                <motion.span
-                  key="saving"
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={labelTransition}
-                  className="inline-flex items-center gap-2"
-                >
-                  <Spinner />
-                  <span>Saving…</span>
-                </motion.span>
-              ) : saveState.kind === 'saved' ? (
-                <motion.span
-                  key="saved"
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={labelTransition}
-                  className="inline-flex items-center gap-2"
-                >
-                  <Check />
-                  <span>Saved</span>
-                </motion.span>
-              ) : (
-                <motion.span
-                  key="idle"
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={labelTransition}
-                >
-                  Save anonymously
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </button>
-        </div>
-
-        {saveState.kind === 'error' ? (
-          <p
-            role="alert"
-            className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700"
-          >
-            {saveState.message}
-          </p>
-        ) : null}
-      </div>
+      {errored ? (
+        <p
+          role="alert"
+          className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
+        >
+          {saveState.kind === 'error' ? saveState.message : ''}
+        </p>
+      ) : null}
     </section>
   );
 }

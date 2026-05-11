@@ -47,20 +47,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'INVALID_RESULT' }, { status: 400 });
   }
 
+  // New schema columns (ship_type_*, scores, keep/cut). The legacy wide-row
+  // columns (clarity_score, mvp_score, etc.) are left null on new rows since
+  // those fields no longer exist in EvaluationResult.
   const row = {
     idea_text: (idea as string).trim(),
     success_criteria: (successCriteria as string).trim(),
     ai_summary: result.summary,
-    clarity_score: result.clarityReview.score,
-    clarity_comment: result.clarityReview.comment,
-    mvp_score: result.mvpScope.score,
-    mvp_comment: result.mvpScope.comment,
-    should_cut: result.mvpScope.shouldCut,
-    first_feature_title: result.firstFeature.title,
-    first_feature_description: result.firstFeature.description,
-    improved_success_metric: result.improvedSuccessMetric,
-    risks: result.risks,
+    // Ship type classification
+    ship_type_key: result.shipType.key,
+    ship_type_name: result.shipType.name,
+    ship_type_name_en: result.shipType.nameEn,
+    ship_type_blurb: result.shipType.blurb,
+    can_ship_in_week: result.shipType.canShipInWeek,
+    confidence_score: result.confidence,
+    // Scores
+    clarity: result.scores.clarity,
+    mvp_scope: result.scores.mvpScope,
+    feasibility: result.scores.feasibility,
+    // Strategy
+    mvp_keep: result.mvpStrategy.keep,
+    mvp_cut: result.mvpStrategy.cut,
     next_actions: result.nextActions,
+    // Consent + image
     allow_anonymous_storage: true,
     allow_content_use: allowContentUse === true,
     concept_image_url:

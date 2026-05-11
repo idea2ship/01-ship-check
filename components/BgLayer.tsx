@@ -71,6 +71,12 @@ export function BgLayer() {
     };
 
     const onMove = (e: PointerEvent) => {
+      // While the cursor is over a tilt-tracking result card we want the
+      // card to react alone — pause bg parallax so they don't compete.
+      if (document.body.dataset.cardHover === 'true') {
+        pointerInside = true;
+        return;
+      }
       pointerInside = true;
       targetX = (e.clientX / window.innerWidth - 0.5) * 120;
       targetY = (e.clientY / window.innerHeight - 0.5) * 120;

@@ -29,7 +29,24 @@ alter table ship_check_ideas enable row level security;
 create index if not exists ship_check_ideas_created_at_idx
   on ship_check_ideas (created_at desc);
 
--- Migration: concept image (idempotent — safe to re-run)
+-- Migration 1: concept image (idempotent — safe to re-run)
 alter table ship_check_ideas
   add column if not exists concept_image_url text,
   add column if not exists concept_image_prompt text;
+
+-- Migration 2: ship-type result shape (MBTI-style classification)
+-- The original wide-row columns above are preserved for backwards
+-- compatibility with the very first saved rows. New rows only populate the
+-- columns below.
+alter table ship_check_ideas
+  add column if not exists ship_type_key text,
+  add column if not exists ship_type_name text,
+  add column if not exists ship_type_name_en text,
+  add column if not exists ship_type_blurb text,
+  add column if not exists can_ship_in_week boolean,
+  add column if not exists confidence_score int,
+  add column if not exists clarity int,
+  add column if not exists mvp_scope int,
+  add column if not exists feasibility int,
+  add column if not exists mvp_keep text[],
+  add column if not exists mvp_cut text[];

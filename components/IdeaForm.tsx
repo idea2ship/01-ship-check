@@ -30,7 +30,7 @@ export function IdeaForm({
   // composing so that first Enter just commits the IME, and a second Enter
   // (after composition is done) actually advances focus.
   const isImeComposing = (e: React.KeyboardEvent<HTMLTextAreaElement>) =>
-    e.nativeEvent.isComposing || e.keyCode === 229;
+    e.nativeEvent.isComposing;
 
   // Plain Enter in idea textarea jumps to success metric.
   // Shift+Enter (or any modifier) preserves a newline for free-form writing.
@@ -58,7 +58,7 @@ export function IdeaForm({
         if (!loading) onSubmit();
       }}
     >
-      <div className="relative flex flex-col gap-7 overflow-hidden rounded-2xl border border-white/60 bg-white/25 p-6 shadow-[0_8px_32px_rgba(26,26,26,0.10),inset_0_0_30px_rgba(255,255,255,0.45)] backdrop-blur-2xl sm:p-8">
+      <div className="relative flex flex-col gap-6 overflow-hidden rounded-2xl border border-ink/[0.06] bg-white/70 p-6 shadow-[0_1px_2px_rgba(26,26,26,0.04)] backdrop-blur-sm sm:p-8">
         <div className="relative z-10 flex flex-col gap-3">
           <label
             htmlFor="idea"
@@ -74,7 +74,7 @@ export function IdeaForm({
             placeholder="예: 학생들이 수업 공지를 확인할 때 마감일과 제출서류를 놓치는 문제를, 신청할 일만 카드로 정리해서 해결한다."
             rows={6}
             maxLength={IDEA_MAX}
-            className="w-full resize-none rounded-lg border border-white/70 bg-white/85 p-4 text-sm leading-relaxed text-ink shadow-inner placeholder:text-ink/45 backdrop-blur-sm focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/15"
+            className="w-full resize-none rounded-lg border border-ink/10 bg-white/90 p-4 text-sm leading-relaxed text-ink placeholder:text-ink/40 focus:border-ink/40 focus:outline-none focus:ring-2 focus:ring-ink/10"
           />
           <p className="text-[11px] text-ink/55">
             Enter로 다음 항목, Shift+Enter로 줄바꿈
@@ -102,7 +102,7 @@ export function IdeaForm({
             placeholder="1주일 후 무엇이 일어나면 성공인가요?"
             rows={2}
             maxLength={SUCCESS_MAX}
-            className="w-full resize-none rounded-lg border border-white/70 bg-white/85 p-4 text-sm leading-relaxed text-ink shadow-inner placeholder:text-ink/45 backdrop-blur-sm focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/15"
+            className="w-full resize-none rounded-lg border border-ink/10 bg-white/90 p-4 text-sm leading-relaxed text-ink placeholder:text-ink/40 focus:border-ink/40 focus:outline-none focus:ring-2 focus:ring-ink/10"
           />
         </div>
 

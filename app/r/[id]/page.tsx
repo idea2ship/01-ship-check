@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ConceptImage } from '@/components/ConceptImage';
 import { Header } from '@/components/Header';
 import { ResultCard } from '@/components/ResultCard';
 import { CopyButton } from '@/components/CopyButton';
@@ -20,16 +19,16 @@ export async function generateMetadata({
   if (!saved) {
     return { title: 'Result not found — /1> Ship Check' };
   }
-  const description = saved.result.firstFeature.title
-    ? `${saved.result.firstFeature.title} · ${saved.result.firstFeature.description}`
-    : saved.result.summary;
+
+  const ogTitle = `${saved.result.shipType.name} · ${saved.result.shipType.nameEn}`;
+  const description = saved.result.summary;
 
   return {
-    title: `${saved.result.summary} — /1> Ship Check`,
+    title: `${ogTitle} — /1> Ship Check`,
     description,
     openGraph: {
-      title: '/1> Ship Check',
-      description: saved.result.summary,
+      title: ogTitle,
+      description,
       siteName: 'idea2ship',
       type: 'article',
       images: saved.conceptImageUrl
@@ -38,15 +37,15 @@ export async function generateMetadata({
               url: saved.conceptImageUrl,
               width: 1024,
               height: 1024,
-              alt: saved.result.firstFeature.title || saved.result.summary,
+              alt: saved.result.shipType.name,
             },
           ]
         : undefined,
     },
     twitter: {
       card: saved.conceptImageUrl ? 'summary_large_image' : 'summary',
-      title: '/1> Ship Check',
-      description: saved.result.summary,
+      title: ogTitle,
+      description,
       images: saved.conceptImageUrl ? [saved.conceptImageUrl] : undefined,
     },
   };
@@ -84,15 +83,7 @@ export default async function SharedResultPage({ params }: PageProps) {
           </p>
         </div>
 
-        {saved.conceptImageUrl ? (
-          <div className="mb-5">
-            <ConceptImage
-              url={saved.conceptImageUrl}
-              alt={saved.result.firstFeature.title || saved.result.summary}
-            />
-          </div>
-        ) : null}
-
+        {/* Idea + Success Metric context (above the result card) */}
         <section className="mb-5 rounded-2xl border border-white/60 bg-white/65 p-5 backdrop-blur-sm">
           <p className="mb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-ink/55">
             Idea
@@ -107,7 +98,11 @@ export default async function SharedResultPage({ params }: PageProps) {
           </p>
         </section>
 
-        <ResultCard result={saved.result} />
+        <ResultCard
+          result={saved.result}
+          conceptImageUrl={saved.conceptImageUrl}
+          showBrandStrip
+        />
 
         <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border-soft pt-6">
           <div className="flex flex-wrap gap-2">
@@ -128,10 +123,6 @@ export default async function SharedResultPage({ params }: PageProps) {
             <span aria-hidden>→</span>
           </Link>
         </div>
-
-        <p className="mt-6 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-ink/45">
-          idea2ship · /1&gt; Ship Check
-        </p>
       </div>
     </main>
   );

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ConceptImage } from './ConceptImage';
 import { IdeaForm } from './IdeaForm';
 import { ParsedHero } from './ParsedHero';
 import { ResultCard } from './ResultCard';
@@ -29,15 +28,7 @@ const PARSE_DEBOUNCE_MS = 900;
 
 type View = 'idle' | 'loading' | 'result';
 
-// Spring drives the FLIP transition when the form moves between columns.
-const layoutSpring = {
-  type: 'spring' as const,
-  stiffness: 220,
-  damping: 28,
-  mass: 0.9,
-};
-
-// Plain easing for fade/slide entries and exits.
+// Easing for the right-column swap between form → skeleton → result.
 const fadeEase = {
   duration: 0.42,
   ease: [0.4, 0, 0.2, 1] as const,
@@ -56,7 +47,6 @@ export function ShipCheck() {
   const [result, setResult] = useState<EvaluationResult | null>(null);
   const evaluateAbortRef = useRef<AbortController | null>(null);
 
-  const [allowContentUse, setAllowContentUse] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>({ kind: 'idle' });
   const [savedId, setSavedId] = useState<string | null>(null);
 
@@ -71,6 +61,7 @@ export function ShipCheck() {
       seedFor(idea, successCriteria),
     );
   }, [result, idea, successCriteria]);
+
 
   useEffect(() => {
     const trimmed = idea.trim();
@@ -176,7 +167,7 @@ export function ShipCheck() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
 
-  async function handleSave() {
+  async function handleSave(allowContentUse: boolean) {
     if (!result) return;
     setSaveState({ kind: 'saving' });
     try {
@@ -216,109 +207,92 @@ export function ShipCheck() {
   return (
     <div className="mx-auto w-full max-w-[1400px] px-6 pt-6 pb-12 sm:px-10 lg:px-12 lg:pt-12 lg:pb-20">
       <div className="grid grid-cols-1 gap-12 lg:grid-cols-2 lg:items-start lg:gap-16 xl:gap-20">
-        {/* Hero — popLayout mode lets the exiting hero be absolutely positioned
-            so the form can begin its FLIP move into the left column immediately
-            instead of waiting for the exit to finish. */}
-        <AnimatePresence mode="popLayout">
-          {view === 'idle' ? (
-            <motion.div
-              key="hero"
-              initial={{ opacity: 0, x: -16 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -32 }}
-              transition={fadeEase}
-              className="lg:order-1 lg:self-center"
-            >
-              <ParsedHero parsedIdea={parsedIdea} parsing={parsing} />
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+        {/* Left column — ParsedHero stays mounted across all states so the
+            parsed sentence is always visible alongside the form/result. */}
+        <div className="lg:order-1 lg:self-start lg:sticky lg:top-12">
+          <ParsedHero parsedIdea={parsedIdea} parsing={parsing} />
+        </div>
 
-        {/* Form — same DOM node throughout; framer's `layout` prop FLIP-animates
-            the position change when the order class flips between states. */}
-        <motion.div
-          layout
-          transition={layoutSpring}
-          className={`w-full ${
-            view === 'idle'
-              ? 'lg:order-2 lg:max-w-lg lg:justify-self-end'
-              : 'lg:order-1 lg:max-w-lg'
-          }`}
-        >
-          <AnimatePresence>
-            {view !== 'idle' ? (
-              <motion.button
-                key="back"
-                type="button"
-                onClick={handleResetToIdle}
-                initial={{ opacity: 0, y: -6 }}
+        {/* Right column — animates between form → skeleton → result.
+            `wait` keeps transitions sequential so they don't visually overlap. */}
+        <div className="lg:order-2 lg:max-w-xl">
+          <AnimatePresence mode="wait">
+            {view === 'idle' ? (
+              <motion.div
+                key="form"
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
-                className="text-glow mb-3 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-ink/65 transition-colors hover:text-ink"
+                exit={{ opacity: 0, y: -8 }}
+                transition={fadeEase}
               >
-                <span aria-hidden>←</span>
-                <span>back to hero</span>
-                <kbd className="rounded border border-ink/20 bg-white/45 px-1.5 py-0.5 text-[9px] font-medium tracking-normal text-ink/70">
-                  ESC
-                </kbd>
-              </motion.button>
+                <IdeaForm
+                  idea={idea}
+                  successCriteria={successCriteria}
+                  loading={loading}
+                  errorMessage={evaluateError}
+                  onIdeaChange={setIdea}
+                  onSuccessChange={setSuccessCriteria}
+                  onSubmit={handleEvaluate}
+                />
+              </motion.div>
+            ) : null}
+
+            {view === 'loading' ? (
+              <motion.div
+                key="skeleton"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={fadeEase}
+              >
+                <BackButton onClick={handleResetToIdle} />
+                <ResultSkeleton />
+              </motion.div>
+            ) : null}
+
+            {view === 'result' && result ? (
+              <motion.div
+                key="result"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={fadeEase}
+                className="space-y-4"
+              >
+                <BackButton onClick={handleResetToIdle} />
+                <ResultCard
+                  key={result.summary + result.confidence}
+                  result={result}
+                  successCriteria={successCriteria}
+                  conceptImageUrl={conceptImageUrl}
+                />
+                <ShareSection
+                  getMarkdown={() => resultToMarkdown(idea, successCriteria, result)}
+                  saveState={saveState}
+                  savedId={savedId}
+                  onSave={handleSave}
+                />
+              </motion.div>
             ) : null}
           </AnimatePresence>
-          <IdeaForm
-            idea={idea}
-            successCriteria={successCriteria}
-            loading={loading}
-            errorMessage={evaluateError}
-            onIdeaChange={setIdea}
-            onSuccessChange={setSuccessCriteria}
-            onSubmit={handleEvaluate}
-          />
-        </motion.div>
-
-        {/* Right side — wait mode keeps skeleton↔result transitions sequential
-            so they don't visually overlap in the same column. */}
-        <AnimatePresence mode="wait">
-          {view === 'loading' ? (
-            <motion.div
-              key="skeleton"
-              initial={{ opacity: 0, x: 32 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0 }}
-              transition={fadeEase}
-              className="lg:order-2"
-            >
-              <ResultSkeleton />
-            </motion.div>
-          ) : null}
-          {view === 'result' && result ? (
-            <motion.div
-              key="result"
-              initial={{ opacity: 0, x: 32 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0 }}
-              transition={fadeEase}
-              className="lg:order-2 space-y-4"
-            >
-              {conceptImageUrl ? (
-                <ConceptImage
-                  url={conceptImageUrl}
-                  alt={result.firstFeature.title || result.summary}
-                />
-              ) : null}
-              <ResultCard result={result} />
-              <ShareSection
-                getMarkdown={() => resultToMarkdown(idea, successCriteria, result)}
-                allowContentUse={allowContentUse}
-                saveState={saveState}
-                savedId={savedId}
-                onAllowContentUseChange={setAllowContentUse}
-                onSave={handleSave}
-              />
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+        </div>
       </div>
     </div>
+  );
+}
+
+function BackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-glow mb-3 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-ink/65 transition-colors hover:text-ink"
+    >
+      <span aria-hidden>←</span>
+      <span>back</span>
+      <kbd className="rounded border border-ink/20 bg-white/45 px-1.5 py-0.5 text-[9px] font-medium tracking-normal text-ink/70">
+        ESC
+      </kbd>
+    </button>
   );
 }

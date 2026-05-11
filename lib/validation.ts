@@ -1,4 +1,10 @@
-import type { EvaluationResult, ParsedField, ParsedIdea } from './types';
+import type {
+  EvaluationResult,
+  ParsedField,
+  ParsedIdea,
+  ShipType,
+  ShipTypeKey,
+} from './types';
 
 export const IDEA_MIN = 20;
 export const IDEA_MAX = 1000;
@@ -39,26 +45,29 @@ export function validateInput(
   return null;
 }
 
+const EVAL_LIMITS = {
+  summary: 100,
+  shipTypeName: 18,
+  shipTypeNameEn: 24,
+  shipTypeBlurb: 80,
+  mvpItem: 28,
+  mvpItemCountMax: 3,
+  action: 36,
+  actionCountMax: 3,
+  imagePrompt: 240,
+};
+
 function clampScore(value: unknown): number {
   const n = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(n)) return 1;
   return Math.max(1, Math.min(5, Math.round(n)));
 }
 
-const EVAL_LIMITS = {
-  summary: 100,
-  comment: 80,
-  title: 18,
-  description: 80,
-  metric: 90,
-  risk: 36,
-  action: 32,
-  shouldCut: 20,
-  shouldCutMax: 3,
-  riskMax: 3,
-  actionMax: 3,
-  imagePrompt: 240,
-};
+function clampConfidence(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return 50;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
 
 function trunc(value: string, max: number): string {
   const t = value.trim();
@@ -80,6 +89,60 @@ function asStringArray(
   return arr;
 }
 
+const SHIP_TYPE_KEYS: ShipTypeKey[] = [
+  'ready_shipper',
+  'scope_down_shipper',
+  'big_vision',
+  'foggy_idea',
+  'discovery_mode',
+];
+
+const SHIP_TYPE_DEFAULTS: Record<
+  ShipTypeKey,
+  { name: string; nameEn: string; canShipInWeek: boolean }
+> = {
+  ready_shipper: { name: '즉시 출시형', nameEn: 'Ship Now', canShipInWeek: true },
+  scope_down_shipper: {
+    name: '핵심 출시형',
+    nameEn: 'Trim & Ship',
+    canShipInWeek: true,
+  },
+  big_vision: { name: '장기 항로형', nameEn: 'Long Game', canShipInWeek: false },
+  foggy_idea: { name: '안개 항로형', nameEn: 'Fog Ahead', canShipInWeek: false },
+  discovery_mode: {
+    name: '탐색 항해형',
+    nameEn: 'Chart First',
+    canShipInWeek: false,
+  },
+};
+
+function normalizeShipType(raw: unknown): ShipType {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const keyRaw = typeof r.key === 'string' ? r.key : '';
+  const key: ShipTypeKey = SHIP_TYPE_KEYS.includes(keyRaw as ShipTypeKey)
+    ? (keyRaw as ShipTypeKey)
+    : 'scope_down_shipper';
+  const defaults = SHIP_TYPE_DEFAULTS[key];
+  const name =
+    typeof r.name === 'string' && r.name.trim().length > 0
+      ? trunc(r.name, EVAL_LIMITS.shipTypeName)
+      : defaults.name;
+  const nameEn =
+    typeof r.nameEn === 'string' && r.nameEn.trim().length > 0
+      ? trunc(r.nameEn, EVAL_LIMITS.shipTypeNameEn)
+      : defaults.nameEn;
+  const blurb =
+    typeof r.blurb === 'string'
+      ? trunc(r.blurb, EVAL_LIMITS.shipTypeBlurb)
+      : '';
+  const canShipInWeek =
+    typeof r.canShipInWeek === 'boolean'
+      ? r.canShipInWeek
+      : defaults.canShipInWeek;
+
+  return { key, name, nameEn, blurb, canShipInWeek };
+}
+
 export function normalizeEvaluation(raw: unknown): EvaluationResult | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
@@ -87,48 +150,34 @@ export function normalizeEvaluation(raw: unknown): EvaluationResult | null {
   const summary = typeof r.summary === 'string' ? r.summary.trim() : '';
   if (!summary) return null;
 
-  const clarity = (r.clarityReview ?? {}) as Record<string, unknown>;
-  const mvp = (r.mvpScope ?? {}) as Record<string, unknown>;
-  const first = (r.firstFeature ?? {}) as Record<string, unknown>;
-
-  const firstTitle = typeof first.title === 'string' ? first.title.trim() : '';
-  const firstDesc = typeof first.description === 'string' ? first.description.trim() : '';
-  if (!firstTitle || !firstDesc) return null;
+  const scores = (r.scores ?? {}) as Record<string, unknown>;
+  const strategy = (r.mvpStrategy ?? {}) as Record<string, unknown>;
 
   return {
     summary: trunc(summary, EVAL_LIMITS.summary),
-    clarityReview: {
-      score: clampScore(clarity.score),
-      comment:
-        typeof clarity.comment === 'string'
-          ? trunc(clarity.comment, EVAL_LIMITS.comment)
-          : '',
+    shipType: normalizeShipType(r.shipType),
+    confidence: clampConfidence(r.confidence),
+    scores: {
+      clarity: clampScore(scores.clarity),
+      mvpScope: clampScore(scores.mvpScope),
+      feasibility: clampScore(scores.feasibility),
     },
-    mvpScope: {
-      score: clampScore(mvp.score),
-      comment:
-        typeof mvp.comment === 'string'
-          ? trunc(mvp.comment, EVAL_LIMITS.comment)
-          : '',
-      shouldCut: asStringArray(
-        mvp.shouldCut,
-        EVAL_LIMITS.shouldCut,
-        EVAL_LIMITS.shouldCutMax,
+    mvpStrategy: {
+      keep: asStringArray(
+        strategy.keep,
+        EVAL_LIMITS.mvpItem,
+        EVAL_LIMITS.mvpItemCountMax,
+      ),
+      cut: asStringArray(
+        strategy.cut,
+        EVAL_LIMITS.mvpItem,
+        EVAL_LIMITS.mvpItemCountMax,
       ),
     },
-    firstFeature: {
-      title: trunc(firstTitle, EVAL_LIMITS.title),
-      description: trunc(firstDesc, EVAL_LIMITS.description),
-    },
-    improvedSuccessMetric:
-      typeof r.improvedSuccessMetric === 'string'
-        ? trunc(r.improvedSuccessMetric, EVAL_LIMITS.metric)
-        : '',
-    risks: asStringArray(r.risks, EVAL_LIMITS.risk, EVAL_LIMITS.riskMax),
     nextActions: asStringArray(
       r.nextActions,
       EVAL_LIMITS.action,
-      EVAL_LIMITS.actionMax,
+      EVAL_LIMITS.actionCountMax,
     ),
     imagePrompt:
       typeof r.imagePrompt === 'string'
@@ -144,13 +193,6 @@ export function isEvaluationResult(value: unknown): value is EvaluationResult {
 /**
  * Pick the correct Korean object particle (을/를) based on whether the
  * last Korean syllable of `s` has a final consonant (jongseong).
- *
- *   has jongseong  → "을"   (e.g., 마감일 놓침 → 놓침을)
- *   no jongseong   → "를"   (e.g., 정보 찾기 어려움 → 어려움를 X, see below)
- *
- * Hangul syllables are encoded at U+AC00..U+D7A3 with the formula
- *   code = 0xAC00 + 초성*588 + 중성*28 + 종성
- * so jongseong = (code - 0xAC00) % 28. 0 means no final consonant.
  */
 export function eulReul(value: string | null | undefined): string {
   if (!value) return '를';
@@ -166,7 +208,10 @@ export function eulReul(value: string | null | undefined): string {
 }
 
 const PARSED_FIELDS: ParsedField[] = ['actor', 'situation', 'problem', 'solution'];
-const SLOT_DISPLAY_MAX = 11;
+// Backend safety cap. The LLM is asked to stay around 5~9 chars; this only
+// kicks in when it overshoots. Raised from 11 → 14 so common phrases like
+// "구현 가능성 확인 어려움" (13 chars) round-trip without ellipsis.
+const SLOT_DISPLAY_MAX = 14;
 const SENTENCE_DISPLAY_MAX = 120;
 
 function nullableString(value: unknown): string | null {
