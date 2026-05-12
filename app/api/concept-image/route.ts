@@ -24,24 +24,65 @@ export const maxDuration = 30;
 
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
 
+/**
+ * In-process LRU cache for generated images.
+ *
+ * The original flow re-hit Cloudflare on every request: the route relied on
+ * `Cache-Control: immutable` to pin the result in client/CDN caches, but a
+ * cold visitor (e.g. someone opening a freshly-shared `/r/[id]` link)
+ * always paid the 5-15 s flux generation. This map keeps the bytes
+ * server-side so every visitor after the first one gets an instant reply.
+ *
+ * Key = `${seed}::${prompt}` — same shape the URL produces, so identical
+ * URLs collide naturally. Size is bounded so a runaway prompt space can't
+ * exhaust RAM (≈ 200 × 150 KB ≈ 30 MB).
+ *
+ * Cache lives in the Node process; a container restart drops it. That's
+ * fine — the next visitor warms it again and pays the generation once.
+ */
+type CacheEntry = { bytes: Buffer; contentType: string };
+const IMAGE_CACHE = new Map<string, CacheEntry>();
+const IMAGE_CACHE_MAX = 200;
+
+function cacheGet(key: string): CacheEntry | undefined {
+  const hit = IMAGE_CACHE.get(key);
+  if (!hit) return undefined;
+  // Bump to most-recently-used position.
+  IMAGE_CACHE.delete(key);
+  IMAGE_CACHE.set(key, hit);
+  return hit;
+}
+
+function cacheSet(key: string, entry: CacheEntry) {
+  if (IMAGE_CACHE.has(key)) IMAGE_CACHE.delete(key);
+  IMAGE_CACHE.set(key, entry);
+  while (IMAGE_CACHE.size > IMAGE_CACHE_MAX) {
+    const oldest = IMAGE_CACHE.keys().next().value;
+    if (oldest === undefined) break;
+    IMAGE_CACHE.delete(oldest);
+  }
+}
+
+// flux-1-schnell is a fast 4-step distill that weights early tokens heavily
+// and ignores classic negative prompts. So: lead with the strongest style
+// anchor, keep total attributes tight (≤6), and phrase exclusions positively.
 const BRAND_STYLE = [
-  'editorial concept illustration in the style of a modern tech magazine cover',
-  'warm ivory background',
-  'electric mint green accent (#59B87B)',
-  'deep charcoal secondary (#1A1A1A)',
-  'matte finish with subtle paper grain',
-  'rule-of-thirds composition',
-  'single clear focal subject with 2-3 supporting elements maximum',
-  'soft diffused lighting, gentle shadows',
-  'flat vector illustration style, smooth gradients, minimal line work',
-  'modern startup aesthetic, premium feel, calm and optimistic mood',
-  'symbolic visual metaphor, not literal product depiction',
+  'flat vector editorial illustration, modern magazine cover aesthetic',
+  'warm ivory paper background with subtle grain',
+  'mint green #59B87B and deep charcoal #1A1A1A duotone palette',
+  'one central symbolic subject with generous breathing room',
+  'crisp focused composition, soft diffused light, gentle layered shadows',
+  'calm optimistic mood, premium minimal startup feel',
 ].join(', ');
 
-const NEGATIVE_HINTS =
-  'do not include: text, letters, numbers, words, logos, watermarks, ' +
-  'UI screenshots, app interfaces, phone or computer screens, ' +
-  'human faces, recognizable people, photorealistic style, blurry or low-quality artifacts';
+// Positive reframing of "no X". schnell respects affirmative descriptors far
+// better than "no/avoid/without".
+const QUALITY_ANCHORS = [
+  'abstract symbolic metaphor instead of literal product depiction',
+  'clean image area free of typography, letters, numbers, logos, UI mockups, device screens, or watermarks',
+  'illustration style only, no photoreal humans or recognizable faces',
+  'sharp clear edges, smooth gradients, high quality',
+].join(', ');
 
 function jsonError(code: string, status: number) {
   return NextResponse.json(
@@ -68,10 +109,26 @@ export async function GET(req: Request) {
 
   const seed = seedParam ? Number.parseInt(seedParam, 10) : undefined;
 
-  // Compose: scene → negative directives → brand style. The order matters:
-  // schnell weights early tokens slightly more, so the scene leads.
+  const cacheKey = `${seedParam ?? '0'}::${promptParam.trim()}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) {
+    // Wrap Buffer in Uint8Array — newer Node/Next type defs reject Buffer
+    // as a BodyInit even though it works at runtime.
+    return new Response(new Uint8Array(cached.bytes), {
+      headers: {
+        'Content-Type': cached.contentType,
+        'Cache-Control':
+          'public, max-age=31536000, immutable, s-maxage=31536000',
+        'X-Image-Cache': 'HIT',
+      },
+    });
+  }
+
+  // Compose: scene → style → quality anchors. schnell weights early tokens
+  // more, so the concrete scene leads, then the visual style locks the look,
+  // then quality anchors clean up the long tail.
   const fullPrompt =
-    `${promptParam.trim()}. ${NEGATIVE_HINTS}. Style: ${BRAND_STYLE}.`;
+    `${promptParam.trim()}. Style: ${BRAND_STYLE}. ${QUALITY_ANCHORS}.`;
 
   const cfUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${MODEL}`;
 
@@ -124,14 +181,26 @@ export async function GET(req: Request) {
 
   const buffer = Buffer.from(base64, 'base64');
 
-  return new Response(buffer, {
+  // CF sometimes returns JPEG bytes even though docs say PNG — sniff the
+  // first 3 bytes so the Content-Type matches the actual format.
+  const isJpeg =
+    buffer.length >= 3 &&
+    buffer[0] === 0xff &&
+    buffer[1] === 0xd8 &&
+    buffer[2] === 0xff;
+  const contentType = isJpeg ? 'image/jpeg' : 'image/png';
+
+  cacheSet(cacheKey, { bytes: buffer, contentType });
+
+  return new Response(new Uint8Array(buffer), {
     headers: {
-      'Content-Type': 'image/png',
+      'Content-Type': contentType,
       // Deterministic URL (prompt + seed) → cache aggressively forever.
       // The hash of inputs is in the URL, so if the input changes the URL
       // changes and the new image is fetched.
       'Cache-Control':
         'public, max-age=31536000, immutable, s-maxage=31536000',
+      'X-Image-Cache': 'MISS',
     },
   });
 }

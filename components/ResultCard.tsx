@@ -28,6 +28,8 @@ export function ResultCard({
   showBrandStrip = false,
 }: Props) {
   const { shipType, confidence, scores, mvpStrategy, nextActions } = result;
+  // result.summary is referenced inline below; not destructured so the
+  // optional-chaining stays explicit.
 
   // Cursor-tracking tilt: spring the raw motion values first (smoother and
   // SSR-safer than spring-on-transform), then derive rotate/glow from them.
@@ -82,81 +84,198 @@ export function ResultCard({
       />
 
       <div className="relative z-10">
-        {/* Concept image — capped at ~176px tall so the share buttons below
-            the card stay within the fold on a typical laptop viewport. */}
-        {conceptImageUrl ? (
-          <div className="mb-3">
-            <ConceptImage
-              url={conceptImageUrl}
-              alt={shipType.name}
-              aspect="aspect-[16/9] max-h-44"
-            />
-          </div>
-        ) : null}
+        {/* Hero — Ship Type info on the left, concept image woven in on the
+            right of the SAME card (no longer a separate boxed image). The
+            shared gradient + tiny decorative sparkles make the image feel
+            like part of the result, not an attachment above it. */}
+        <div className="relative mb-2.5 overflow-hidden rounded-[1.5rem] border border-mint-strong/25 bg-gradient-to-br from-mint-soft via-white/75 to-white/55 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] sm:p-6">
+          {/* Decorative sparkles scattered around the image edge */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute right-6 top-3 text-[10px] text-mint-strong/60"
+          >
+            ✦
+          </span>
+          <span
+            aria-hidden
+            className="pointer-events-none absolute right-32 top-10 text-[8px] text-mint-strong/40"
+          >
+            ✦
+          </span>
+          <span
+            aria-hidden
+            className="pointer-events-none absolute bottom-4 right-10 text-[9px] text-mint-strong/50"
+          >
+            ✦
+          </span>
 
-        {/* Ship type — promoted to the card's visual anchor. Confidence is
-            demoted to a small chip in the corner so the type name dominates. */}
-        <div className="relative mb-2.5 overflow-hidden rounded-2xl border border-mint-strong/25 bg-gradient-to-br from-mint-soft via-white/70 to-white/55 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
-          <p className="mb-1 font-mono text-[10px] font-semibold uppercase tracking-[0.28em] text-mint-strong">
-            Ship Type
-          </p>
-          <h2 className="text-3xl font-black leading-[1.05] tracking-tight text-ink sm:text-[2.25rem]">
-            {shipType.name}
-          </h2>
-          <p className="mt-1 font-mono text-xs uppercase tracking-[0.16em] text-ink/55">
-            {shipType.nameEn}
-          </p>
+          <div className="grid grid-cols-1 items-center gap-4 sm:grid-cols-[1fr_140px] sm:gap-5">
+            <div className="min-w-0">
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.28em] text-mint-strong">
+                  Ship Type
+                </p>
+                <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/45 sm:hidden">
+                  Score
+                </p>
+              </div>
 
-          <div className="absolute right-4 top-4 flex items-baseline gap-0.5 rounded-full border border-ink/10 bg-white/75 px-2.5 py-1 shadow-sm backdrop-blur-sm">
-            <span className="text-base font-black leading-none tracking-tight text-ink">
-              {confidence}
-            </span>
-            <span className="text-[10px] font-bold text-ink/55">/100</span>
+              <div className="flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="font-display text-[1.75rem] font-extrabold leading-[1.05] tracking-tight text-ink sm:text-[2rem]">
+                    {shipType.name}
+                  </h2>
+                  <p className="mt-1 font-mono text-[12px] uppercase tracking-[0.18em] text-ink/55">
+                    {shipType.nameEn}
+                  </p>
+                </div>
+                <p className="flex shrink-0 items-baseline leading-none">
+                  <span className="font-display text-[2.75rem] font-black tracking-tight text-ink">
+                    {confidence}
+                  </span>
+                  <span className="ml-0.5 text-[10px] font-bold text-ink/45">
+                    /100
+                  </span>
+                </p>
+              </div>
+
+              {/* Progress bar + qualitative band */}
+              <div className="mt-3.5">
+                <div
+                  className="h-2 w-full overflow-hidden rounded-full bg-ink/[0.07]"
+                  role="progressbar"
+                  aria-valuenow={confidence}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  <div
+                    className="h-full rounded-full bg-mint-strong"
+                    style={{ width: `${Math.max(2, confidence)}%` }}
+                  />
+                </div>
+                <p className="mt-2 flex items-center gap-1 text-[12px] font-medium text-ink/65">
+                  <span aria-hidden className="text-mint-strong">
+                    ✦
+                  </span>
+                  <span>{scoreBandLabel(confidence)}</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Concept image — embedded inside the hero, no heavy border so
+                it reads as part of the gradient surface rather than a chip
+                pasted on top. */}
+            {conceptImageUrl ? (
+              <div className="mx-auto w-[78%] max-w-[180px] sm:mx-0 sm:w-auto sm:max-w-none">
+                <div className="relative">
+                  <ConceptImage
+                    url={conceptImageUrl}
+                    alt={shipType.name}
+                    aspect="aspect-square"
+                    embedded
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
-          <p className="absolute right-4 top-12 text-[9px] uppercase tracking-wider text-ink/45">
-            신뢰도
-          </p>
         </div>
 
-        {/* Can Ship banner / fallback comment */}
-        {shipType.canShipInWeek ? (
-          <div className="mb-2.5 flex items-center gap-2.5 rounded-xl bg-mint-soft px-3 py-2">
-            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-mint-strong text-white">
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M20 6 9 17l-5-5" />
-              </svg>
-            </span>
-            <p className="text-xs leading-snug">
-              <span className="font-bold text-mint-strong">Can Ship in 1 Week</span>
-              {shipType.blurb ? (
-                <span className="ml-1.5 text-ink/80">{shipType.blurb}</span>
-              ) : null}
-            </p>
-          </div>
-        ) : shipType.blurb ? (
-          <div className="mb-2.5 rounded-xl bg-ink/[0.04] px-3 py-2 text-xs leading-snug text-ink/80">
-            {shipType.blurb}
-          </div>
-        ) : null}
-
-        {/* User's success criteria, framed as the measurable goal that
-            grounds the rest of the analysis. */}
-        {successCriteria && successCriteria.trim().length > 0 ? (
-          <div className="mb-2.5 rounded-2xl border border-white/70 bg-white/60 p-4">
-            <div className="mb-1.5 flex items-center gap-1.5">
-              <IconTarget />
-              <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/65">
-                측정 가능한 성공 기준
-              </p>
+        {/* AI summary + Verdict — paired 2-col cards. Hidden / amber treat
+            for the non-shippable case. */}
+        <div className="mb-2.5 grid gap-2.5 sm:grid-cols-2">
+          {result.summary && result.summary.trim().length > 0 ? (
+            <div className="rounded-2xl border border-mint-strong/20 bg-mint-soft/60 px-4 py-3">
+              <div className="flex items-start gap-2">
+                <span className="mt-0.5 shrink-0">
+                  <SparkleIcon />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="mb-1 text-[13px] font-bold text-mint-strong">
+                    AI 한 줄 요약
+                  </p>
+                  <p className="text-sm leading-snug text-ink/85">
+                    {result.summary.trim()}
+                  </p>
+                </div>
+              </div>
             </div>
-            <p className="text-sm leading-snug text-ink/85">
-              {successCriteria.trim()}
-            </p>
-          </div>
-        ) : null}
+          ) : (
+            // Empty placeholder so the grid keeps its 2-col rhythm even when
+            // the LLM didn't return a summary.
+            <div />
+          )}
 
-        {/* 3 metrics row */}
-        <div className="mb-2.5 grid grid-cols-3 divide-x divide-ink/10 rounded-2xl border border-white/70 bg-white/60 p-3">
+          {shipType.canShipInWeek ? (
+            <div className="rounded-2xl border border-mint-strong/20 bg-mint-soft/60 px-4 py-3">
+              <div className="flex items-start gap-2">
+                <span className="mt-0.5 inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-mint-strong text-white">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="mb-1 text-[13px] font-bold text-mint-strong">
+                    Can Ship in 1 Week
+                  </p>
+                  <p className="text-sm leading-snug text-ink/85">
+                    {shipType.blurb || '1주 안에 출시 가능'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-amber-400/30 bg-amber-100/60 px-4 py-3">
+              <div className="flex items-start gap-2">
+                <span className="mt-0.5 inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-amber-500 text-white">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <line x1="12" x2="12" y1="9" y2="13" />
+                    <line x1="12" x2="12.01" y1="17" y2="17" />
+                  </svg>
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="mb-1 text-[13px] font-bold text-amber-700">
+                    Not Yet Shippable
+                  </p>
+                  <p className="text-sm leading-snug text-ink/85">
+                    {shipType.blurb || '조금 더 다듬어야 해요'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Measurable goal — prefer the LLM-refined version; fall back to
+            the user's raw input so older rows without the refined column
+            still render cleanly. */}
+        {(() => {
+          const refined = result.refinedSuccessMetric?.trim() ?? '';
+          const raw = successCriteria?.trim() ?? '';
+          const display = refined || raw;
+          if (!display) return null;
+          return (
+            <div className="mb-2.5 rounded-2xl border border-mint-strong/20 bg-mint-soft/40 p-4">
+              <div className="flex items-start gap-2">
+                <span className="mt-0.5 shrink-0">
+                  <IconTarget />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="mb-1 text-[13px] font-bold text-mint-strong">
+                    측정 가능한 성공 기준
+                  </p>
+                  <p className="text-sm leading-snug text-ink/85">
+                    {display}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* 3 metrics row — compact, with a mini progress bar under each
+            value so the eye reads the score at a glance instead of having
+            to parse "4/5" math. */}
+        <div className="mb-2.5 grid grid-cols-3 gap-2 rounded-2xl border border-white/70 bg-white/60 p-3 sm:p-3.5">
           <Metric icon={<IconClarity />} label="명확성" value={scores.clarity} />
           <Metric icon={<IconScope />} label="MVP 범위" value={scores.mvpScope} />
           <Metric icon={<IconBolt />} label="실행 가능성" value={scores.feasibility} />
@@ -165,7 +284,7 @@ export function ResultCard({
         {/* Keep / Cut + Next Actions */}
         <div className="grid gap-2.5 sm:grid-cols-2">
           <div className="rounded-2xl border border-white/70 bg-white/60 p-4">
-            <h3 className="mb-2 flex items-center gap-1.5 text-xs font-bold text-ink">
+            <h3 className="mb-2 flex items-center gap-1.5 text-[13px] font-bold text-mint-strong">
               <IconStar />
               <span>이번 주 MVP</span>
             </h3>
@@ -197,7 +316,7 @@ export function ResultCard({
           </div>
 
           <div className="rounded-2xl border border-white/70 bg-white/60 p-4">
-            <h3 className="mb-2 flex items-center gap-1.5 text-xs font-bold text-ink">
+            <h3 className="mb-2 flex items-center gap-1.5 text-[13px] font-bold text-mint-strong">
               <IconFlag />
               <span>다음 행동 3가지</span>
             </h3>
@@ -230,6 +349,27 @@ export function ResultCard({
   );
 }
 
+// Score band → semantic color. 1 = red, 2-3 = amber, 4-5 = mint (default).
+// Tailwind classes are static strings so JIT can pick them up; computing class
+// names via template literals at runtime would defeat purge.
+function metricTone(value: number) {
+  if (value <= 1) {
+    return { icon: 'text-red-500', bar: 'bg-red-500', value: 'text-red-600' };
+  }
+  if (value <= 3) {
+    return {
+      icon: 'text-amber-500',
+      bar: 'bg-amber-500',
+      value: 'text-amber-600',
+    };
+  }
+  return {
+    icon: 'text-mint-strong',
+    bar: 'bg-mint-strong',
+    value: 'text-ink',
+  };
+}
+
 function Metric({
   icon,
   label,
@@ -239,15 +379,63 @@ function Metric({
   label: string;
   value: number;
 }) {
+  const pct = Math.max(8, Math.min(100, (value / 5) * 100));
+  const tone = metricTone(value);
   return (
-    <div className="flex flex-col items-center justify-center px-2">
-      <div className="mb-0.5 text-mint-strong">{icon}</div>
-      <p className="mb-0.5 text-[10px] font-medium text-ink/55">{label}</p>
-      <p className="text-base font-bold text-ink sm:text-lg">
-        {value}
-        <span className="ml-0.5 text-[10px] font-medium text-ink/40">/5</span>
-      </p>
+    <div className="flex min-w-0 flex-col gap-1.5 rounded-xl bg-white/40 px-3 py-2.5">
+      <div className="flex items-center gap-1.5">
+        <div className={`shrink-0 ${tone.icon}`}>{icon}</div>
+        <p className="truncate text-[11px] font-medium text-ink/60">{label}</p>
+      </div>
+      <div className="flex items-baseline gap-1">
+        <span
+          className={`text-xl font-bold leading-none sm:text-[1.4rem] ${tone.value}`}
+        >
+          {value}
+        </span>
+        <span className="text-[10px] font-medium text-ink/40">/5</span>
+      </div>
+      <div
+        className="h-1 w-full overflow-hidden rounded-full bg-ink/[0.06]"
+        role="progressbar"
+        aria-valuenow={value}
+        aria-valuemin={0}
+        aria-valuemax={5}
+      >
+        <div
+          className={`h-full rounded-full ${tone.bar}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
     </div>
+  );
+}
+
+function scoreBandLabel(score: number): string {
+  if (score >= 80) return '이대로 출시 가능';
+  if (score >= 60) return '조금만 다듬으면 출시 가능';
+  if (score >= 40) return '한 번 더 구체화가 필요';
+  return '아직 탐색 단계';
+}
+
+function SparkleIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      className="mt-0.5 shrink-0 text-mint-strong"
+    >
+      <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
+      <path d="M20 3v4" />
+      <path d="M22 5h-4" />
+    </svg>
   );
 }
 
@@ -282,7 +470,7 @@ function IconBolt() {
 
 function IconTarget() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-mint-strong" aria-hidden>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-mint-strong" aria-hidden>
       <circle cx="12" cy="12" r="10" />
       <circle cx="12" cy="12" r="6" />
       <circle cx="12" cy="12" r="2" />
@@ -292,7 +480,7 @@ function IconTarget() {
 
 function IconStar() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-mint-strong" aria-hidden>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-mint-strong" aria-hidden>
       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
     </svg>
   );
@@ -300,7 +488,7 @@ function IconStar() {
 
 function IconFlag() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-mint-strong" aria-hidden>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-mint-strong" aria-hidden>
       <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
       <line x1="4" x2="4" y1="22" y2="15" />
     </svg>

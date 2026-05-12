@@ -90,7 +90,28 @@ summary: 1 문장, ≤80자. OG 카드 설명과 MD 내보내기에 쓰임.
 == shipType.blurb ==
 
 shipType.blurb: 1 문장, ≤60자. Can Ship 배너에 표시.
-예: "핵심만 남기면 1주일 안에 출시할 수 있어요."
+예: "핵심만 남기면 1주 안에 출시 가능."
+
+== refinedSuccessMetric ==
+
+refinedSuccessMetric: 사용자가 입력한 "성공 기준"을, 1주일 후 검증 가능한 한 문장의 측정 가능한 형태로 다듬은 것.
+
+규칙:
+- 한 문장, ≤60자.
+- 가능하면 숫자/시점을 명시: "1주 후 X명이 Y하면 성공" 형식 선호.
+- 사용자 입력이 이미 충분히 측정 가능하면 거의 그대로 두되, 표현만 깔끔하게.
+- 사용자 입력이 모호하면(예: "잘 됐으면 좋겠다", "내가 직접 써볼 수 있으면") 합리적인 구체 지표로 변환:
+  - "내가 직접 써본다" → "1주 후 본인이 일상에서 1회 이상 사용"
+  - "사람들이 좋아하면" → "1주 후 사용자 5명이 재방문"
+  - "공유가 잘 되면" → "1주 후 공유 링크 10건 이상"
+- 동사로 끝내지 말고 측정 가능한 결과 형태로.
+
+예:
+입력: "내가 직접 사용해볼 수 있으면 좋을 것 같아요"
+출력: "1주 후 본인이 매일 1회 이상 직접 사용"
+
+입력: "30명 사용"
+출력: "1주 후 30명이 1회 이상 사용"
 
 == imagePrompt (영어 80~220자) ==
 
@@ -156,7 +177,8 @@ imagePrompt: "A small writer figure with a lantern walking into a soft foggy lan
     "cut": ["string", ...]
   },
   "nextActions": ["string", "string", "string"],
-  "imagePrompt": "English"
+  "imagePrompt": "English",
+  "refinedSuccessMetric": "Korean ≤60자"
 }`;
 
 const PARSE_SYSTEM_PROMPT = `당신은 한국어 서비스 아이디어 문장에서 핵심 의미 요소를 짧게 추출하는 파서입니다.

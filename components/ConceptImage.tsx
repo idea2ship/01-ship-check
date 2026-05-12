@@ -7,6 +7,12 @@ type Props = {
   alt?: string;
   /** Tailwind aspect class. Defaults to 16/9 (less tall than the older 4/3). */
   aspect?: string;
+  /**
+   * When the image is rendered inside a card that already has its own
+   * gradient surface, drop the white border and self-gradient so the image
+   * blends in instead of looking like a separate chip pasted on top.
+   */
+  embedded?: boolean;
 };
 
 /**
@@ -20,6 +26,7 @@ export function ConceptImage({
   url,
   alt = 'Concept image',
   aspect = 'aspect-[16/9]',
+  embedded = false,
 }: Props) {
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
@@ -53,10 +60,25 @@ export function ConceptImage({
     setNonce((n) => n + 1);
   }
 
+  const wrapperBase = `relative ${aspect} overflow-hidden rounded-2xl`;
+  const wrapperSkin = embedded
+    ? 'bg-transparent'
+    : 'border border-white/60 bg-gradient-to-br from-mint-soft via-cream to-mint-soft/40';
+
+  // Soft radial fade pushes the image edges into transparency, letting the
+  // parent card's gradient bleed through so the image reads as part of the
+  // surface rather than a separate chip. Only applied when embedded.
+  const embeddedMask = embedded
+    ? {
+        WebkitMaskImage:
+          'radial-gradient(ellipse at center, black 52%, transparent 92%)',
+        maskImage:
+          'radial-gradient(ellipse at center, black 52%, transparent 92%)',
+      }
+    : undefined;
+
   return (
-    <div
-      className={`relative ${aspect} overflow-hidden rounded-2xl border border-white/60 bg-gradient-to-br from-mint-soft via-cream to-mint-soft/40`}
-    >
+    <div className={`${wrapperBase} ${wrapperSkin}`} style={embeddedMask}>
       {!failed ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img

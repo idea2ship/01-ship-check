@@ -1,7 +1,47 @@
 'use client';
 
+import { motion } from 'framer-motion';
 import { eulReul } from '@/lib/validation';
 import type { ParsedIdea } from '@/lib/types';
+
+/**
+ * Per-character idle jitter so the "실시간 분석 중" label feels like it's
+ * actively listening. Each char gets its own duration/delay/amplitude
+ * derived from its index — deterministic so the layout doesn't reflow,
+ * but unsynced enough to read as live noise rather than a synced pulse.
+ */
+function JitterText({ text, active }: { text: string; active: boolean }) {
+  const chars = Array.from(text);
+  return (
+    <span aria-label={text} className="inline-flex">
+      {chars.map((c, idx) => {
+        const dur = 1.6 + ((idx * 7) % 8) * 0.13;
+        const delay = ((idx * 13) % 11) * 0.13;
+        const amp = active
+          ? 0.9 + ((idx * 5) % 6) * 0.22
+          : 0.4 + ((idx * 5) % 6) * 0.1;
+        return (
+          <motion.span
+            key={idx}
+            aria-hidden
+            className="inline-block whitespace-pre"
+            animate={{
+              y: [0, -amp, 0, amp * 0.55, 0],
+            }}
+            transition={{
+              duration: dur,
+              delay,
+              repeat: Infinity,
+              ease: 'easeInOut',
+            }}
+          >
+            {c === ' ' ? ' ' : c}
+          </motion.span>
+        );
+      })}
+    </span>
+  );
+}
 
 type Props = {
   parsedIdea: ParsedIdea | null;
@@ -45,15 +85,15 @@ export function ParsedHero({ parsedIdea, parsing }: Props) {
   return (
     <section className="text-glow">
       <div className="mb-8 flex items-center gap-2 lg:mb-12">
-        <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.22em] text-mint-strong">
-          Live Analysis
+        <span className="text-[12px] font-semibold tracking-[0.04em] text-mint-strong">
+          <JitterText text="실시간 분석 중" active={parsing} />
         </span>
         <span
           className={`h-1.5 w-1.5 rounded-full bg-mint-strong ${parsing ? 'animate-pulse' : ''}`}
         />
       </div>
 
-      <div className="space-y-5 text-3xl font-black leading-[1.3] tracking-tight sm:text-4xl lg:space-y-6 lg:text-5xl">
+      <div className="space-y-5 font-display text-3xl font-extrabold leading-[1.3] tracking-tight sm:text-4xl lg:space-y-6 lg:text-5xl">
         <div className="slot-row flex animate-row-rise items-baseline">
           <Chip value={parsedIdea?.actor} fallback="누가" />
         </div>

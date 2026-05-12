@@ -59,6 +59,12 @@ export type EvaluationResult = {
   nextActions: string[]; // exactly 3, each ≤25 chars, verb-start
   /** English prompt for concept image generation (no brand tokens — added in lib/image.ts) */
   imagePrompt: string;
+  /**
+   * Refined, measurable rewrite of the user's success criteria. Phrased as a
+   * single concrete sentence the user can verify after 1 week. LLM-generated;
+   * may be empty if the model couldn't improve on the input.
+   */
+  refinedSuccessMetric: string;
 };
 
 export type EvaluateRequest = {

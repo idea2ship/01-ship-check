@@ -15,11 +15,23 @@ const config: Config = {
       },
       fontFamily: {
         sans: [
+          'Pretendard Variable',
+          'Pretendard',
           '-apple-system',
           'BlinkMacSystemFont',
           'Segoe UI',
           'Helvetica',
           'Arial',
+          'sans-serif',
+        ],
+        display: [
+          'SUIT Variable',
+          'SUIT',
+          'Pretendard Variable',
+          'Pretendard',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          'Segoe UI',
           'sans-serif',
         ],
         mono: [

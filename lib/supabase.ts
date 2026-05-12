@@ -102,6 +102,10 @@ export async function getSavedIdea(id: string): Promise<SavedIdea | null> {
       ? (data.next_actions as string[])
       : [],
     imagePrompt: data.concept_image_prompt ?? '',
+    refinedSuccessMetric:
+      typeof data.refined_success_metric === 'string'
+        ? data.refined_success_metric
+        : '',
   };
 
   return {

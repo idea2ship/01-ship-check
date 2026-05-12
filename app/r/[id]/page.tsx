@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Header } from '@/components/Header';
 import { ResultCard } from '@/components/ResultCard';
-import { CopyButton } from '@/components/CopyButton';
+import { SharedResultActions } from '@/components/SharedResultActions';
 import { resultToMarkdown } from '@/lib/markdown';
 import { getSavedIdea } from '@/lib/supabase';
 
@@ -23,6 +23,9 @@ export async function generateMetadata({
   const ogTitle = `${saved.result.shipType.name} · ${saved.result.shipType.nameEn}`;
   const description = saved.result.summary;
 
+  // Note: OG image itself is auto-discovered from `app/r/[id]/opengraph-image.tsx`,
+  // which renders a 1200×630 result-card-style preview. Setting `images` here
+  // would override that, so we deliberately leave it off.
   return {
     title: `${ogTitle} — /1> Ship Check`,
     description,
@@ -31,22 +34,11 @@ export async function generateMetadata({
       description,
       siteName: 'idea2ship',
       type: 'article',
-      images: saved.conceptImageUrl
-        ? [
-            {
-              url: saved.conceptImageUrl,
-              width: 1024,
-              height: 1024,
-              alt: saved.result.shipType.name,
-            },
-          ]
-        : undefined,
     },
     twitter: {
-      card: saved.conceptImageUrl ? 'summary_large_image' : 'summary',
+      card: 'summary_large_image',
       title: ogTitle,
       description,
-      images: saved.conceptImageUrl ? [saved.conceptImageUrl] : undefined,
     },
   };
 }
@@ -105,21 +97,12 @@ export default async function SharedResultPage({ params }: PageProps) {
         />
 
         <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border-soft pt-6">
-          <div className="flex flex-wrap gap-2">
-            <CopyButton getText={() => markdown} label="Copy result" />
-            <CopyButton
-              getText={() =>
-                typeof window !== 'undefined' ? window.location.href : ''
-              }
-              label="Copy link"
-              copiedLabel="Link copied"
-            />
-          </div>
+          <SharedResultActions markdown={markdown} />
           <Link
             href="/"
             className="inline-flex items-center gap-1.5 rounded-2xl bg-ink px-5 py-2.5 text-sm font-medium text-cream transition hover:bg-ink/90"
           >
-            <span>Make your own</span>
+            <span>직접 해보기</span>
             <span aria-hidden>→</span>
           </Link>
         </div>

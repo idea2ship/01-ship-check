@@ -6,8 +6,13 @@ import { IdeaForm } from './IdeaForm';
 import { ParsedHero } from './ParsedHero';
 import { ResultCard } from './ResultCard';
 import { ResultSkeleton } from './ResultSkeleton';
-import { ShareSection, type SaveState } from './ShareSection';
+import {
+  ShareSection,
+  type ShareState,
+  type LocalSaveState,
+} from './ShareSection';
 import { buildConceptImageUrl, seedFor } from '@/lib/image';
+import { copyToClipboard } from '@/lib/clipboard';
 import { resultToMarkdown } from '@/lib/markdown';
 import type { EvaluationResult, ParsedIdea } from '@/lib/types';
 import { IDEA_MIN, PARSE_MIN, SUCCESS_MIN } from '@/lib/validation';
@@ -28,6 +33,38 @@ const PARSE_DEBOUNCE_MS = 900;
 
 type View = 'idle' | 'loading' | 'result';
 
+/**
+ * Resolves once the image at `url` has loaded (or errored / timed out).
+ * Honours an AbortSignal so an in-flight wait can be cancelled when the
+ * user hits ESC or starts a new evaluation.
+ */
+function waitForImage(
+  url: string,
+  signal: AbortSignal,
+  timeoutMs: number,
+): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    if (signal.aborted) return resolve();
+    const img = new window.Image();
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      img.onload = null;
+      img.onerror = null;
+      signal.removeEventListener('abort', finish);
+      clearTimeout(timer);
+      resolve();
+    };
+    img.onload = finish;
+    img.onerror = finish;
+    signal.addEventListener('abort', finish);
+    const timer = setTimeout(finish, timeoutMs);
+    img.src = url;
+  });
+}
+
 // Easing for the right-column swap between form → skeleton → result.
 const fadeEase = {
   duration: 0.42,
@@ -47,8 +84,12 @@ export function ShipCheck() {
   const [result, setResult] = useState<EvaluationResult | null>(null);
   const evaluateAbortRef = useRef<AbortController | null>(null);
 
-  const [saveState, setSaveState] = useState<SaveState>({ kind: 'idle' });
+  const [shareState, setShareState] = useState<ShareState>({ kind: 'idle' });
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [localSaveState, setLocalSaveState] = useState<LocalSaveState>({
+    kind: 'idle',
+  });
+  const saveAbortRef = useRef<AbortController | null>(null);
 
   const view: View = loading ? 'loading' : result ? 'result' : 'idle';
 
@@ -112,8 +153,10 @@ export function ShipCheck() {
     setLoading(true);
     setEvaluateError(null);
     setResult(null);
-    setSaveState({ kind: 'idle' });
+    setShareState({ kind: 'idle' });
     setSavedId(null);
+    setLocalSaveState({ kind: 'idle' });
+    saveAbortRef.current?.abort();
 
     try {
       const res = await fetch('/api/evaluate', {
@@ -129,7 +172,22 @@ export function ShipCheck() {
         setEvaluateError(ERROR_MESSAGES[code] ?? ERROR_MESSAGES.UNKNOWN);
         return;
       }
-      setResult(data as EvaluationResult);
+
+      // Preload the concept image so the result card doesn't appear with a
+      // half-empty image slot that keeps animating after everything else has
+      // settled. We cap the wait so a slow CF generation doesn't trap the
+      // user in the loading state forever.
+      const evalResult = data as EvaluationResult;
+      if (evalResult?.imagePrompt) {
+        const imgUrl = buildConceptImageUrl(
+          evalResult.imagePrompt,
+          seedFor(idea, successCriteria),
+        );
+        await waitForImage(imgUrl, controller.signal, 28_000);
+        if (controller.signal.aborted) return;
+      }
+
+      setResult(evalResult);
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
       setEvaluateError(ERROR_MESSAGES.NETWORK);
@@ -140,11 +198,13 @@ export function ShipCheck() {
 
   function handleResetToIdle() {
     evaluateAbortRef.current?.abort();
+    saveAbortRef.current?.abort();
     setLoading(false);
     setResult(null);
     setEvaluateError(null);
-    setSaveState({ kind: 'idle' });
+    setShareState({ kind: 'idle' });
     setSavedId(null);
+    setLocalSaveState({ kind: 'idle' });
   }
 
   // ESC anywhere on the page returns to the hero view (and cancels an
@@ -167,10 +227,86 @@ export function ShipCheck() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
 
-  async function handleSave(allowContentUse: boolean) {
+  // User-driven share: POST /api/save, get id, build URL, auto-copy.
+  // If we already saved once (savedId set), skip the network round-trip and
+  // re-copy the same URL.
+  async function handleShare() {
     if (!result) return;
-    setSaveState({ kind: 'saving' });
+    if (shareState.kind === 'sharing') return;
+
+    let id = savedId;
+
+    if (!id) {
+      const controller = new AbortController();
+      saveAbortRef.current?.abort();
+      saveAbortRef.current = controller;
+      setShareState({ kind: 'sharing' });
+
+      try {
+        const res = await fetch('/api/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            idea,
+            successCriteria,
+            result,
+            allowAnonymousStorage: true,
+            allowContentUse: false,
+            conceptImageUrl,
+            conceptImagePrompt: result.imagePrompt,
+          }),
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
+        if (!res.ok) {
+          setShareState({ kind: 'error' });
+          return;
+        }
+        const data = (await res.json().catch(() => ({}))) as { id?: string };
+        if (!data.id) {
+          setShareState({ kind: 'error' });
+          return;
+        }
+        id = data.id;
+        setSavedId(id);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        setShareState({ kind: 'error' });
+        return;
+      }
+    }
+
+    const url = `${window.location.origin}/r/${id}`;
+    // Use the shared helper so the fallback path is identical to the other
+    // copy actions on the page. Save succeeded either way; clipboard
+    // failure just means the user has to copy by hand.
+    await copyToClipboard(url);
+    setShareState({ kind: 'copied', url });
+  }
+
+  // Contributor opt-in: save to server with allow_content_use=true. If the
+  // row already exists (share was clicked first), PATCH consent instead of
+  // creating a duplicate.
+  async function handleContribute() {
+    if (!result) return;
+    if (localSaveState.kind === 'saving') return;
+    setLocalSaveState({ kind: 'saving' });
+
     try {
+      if (savedId) {
+        const res = await fetch('/api/save/consent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: savedId, allowContentUse: true }),
+        });
+        if (!res.ok) {
+          setLocalSaveState({ kind: 'error' });
+          return;
+        }
+        setLocalSaveState({ kind: 'saved' });
+        return;
+      }
+
       const res = await fetch('/api/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -179,37 +315,33 @@ export function ShipCheck() {
           successCriteria,
           result,
           allowAnonymousStorage: true,
-          allowContentUse,
+          allowContentUse: true,
           conceptImageUrl,
           conceptImagePrompt: result.imagePrompt,
         }),
       });
       if (!res.ok) {
-        setSaveState({
-          kind: 'error',
-          message:
-            '저장 중 문제가 발생했습니다. 평가 결과는 복사해서 보관할 수 있습니다.',
-        });
+        setLocalSaveState({ kind: 'error' });
         return;
       }
       const data = (await res.json().catch(() => ({}))) as { id?: string };
       if (data.id) setSavedId(data.id);
-      setSaveState({ kind: 'saved' });
+      setLocalSaveState({ kind: 'saved' });
     } catch {
-      setSaveState({
-        kind: 'error',
-        message:
-          '저장 중 문제가 발생했습니다. 평가 결과는 복사해서 보관할 수 있습니다.',
-      });
+      setLocalSaveState({ kind: 'error' });
     }
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-6 pt-6 pb-12 sm:px-10 lg:px-12 lg:pt-12 lg:pb-20">
+    <div
+      className={`mx-auto w-full max-w-[1400px] px-6 pb-12 sm:px-10 lg:px-12 lg:pb-20 ${
+        view === 'idle' ? 'pt-6 lg:pt-10' : 'pt-0 lg:pt-0'
+      }`}
+    >
       <div className="grid grid-cols-1 gap-12 lg:grid-cols-2 lg:items-start lg:gap-16 xl:gap-20">
         {/* Left column — ParsedHero stays mounted across all states so the
             parsed sentence is always visible alongside the form/result. */}
-        <div className="lg:order-1 lg:self-start lg:sticky lg:top-12">
+        <div className="lg:order-1 lg:self-start lg:sticky lg:top-4">
           <ParsedHero parsedIdea={parsedIdea} parsing={parsing} />
         </div>
 
@@ -257,7 +389,7 @@ export function ShipCheck() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
                 transition={fadeEase}
-                className="space-y-4"
+                className="space-y-3"
               >
                 <BackButton onClick={handleResetToIdle} />
                 <ResultCard
@@ -268,9 +400,11 @@ export function ShipCheck() {
                 />
                 <ShareSection
                   getMarkdown={() => resultToMarkdown(idea, successCriteria, result)}
-                  saveState={saveState}
-                  savedId={savedId}
-                  onSave={handleSave}
+                  shareState={shareState}
+                  contributeState={localSaveState}
+                  onShare={handleShare}
+                  onContribute={handleContribute}
+                  onResetShare={() => setShareState({ kind: 'idle' })}
                 />
               </motion.div>
             ) : null}
@@ -286,7 +420,7 @@ function BackButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="text-glow mb-3 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-ink/65 transition-colors hover:text-ink"
+      className="text-glow mb-1 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-ink/65 transition-colors hover:text-ink"
     >
       <span aria-hidden>←</span>
       <span>back</span>

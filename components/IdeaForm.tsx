@@ -71,7 +71,7 @@ export function IdeaForm({
             value={idea}
             onChange={(e) => onIdeaChange(e.target.value)}
             onKeyDown={handleIdeaKeyDown}
-            placeholder="예: 학생들이 수업 공지를 확인할 때 마감일과 제출서류를 놓치는 문제를, 신청할 일만 카드로 정리해서 해결한다."
+            placeholder="예: 운동을 시작하려는 직장인이 매번 작심삼일에 그치는 문제를, 친구와 매일 10분 인증하는 챌린지로 해결한다."
             rows={6}
             maxLength={IDEA_MAX}
             className="w-full resize-none rounded-lg border border-ink/10 bg-white/90 p-4 text-sm leading-relaxed text-ink placeholder:text-ink/40 focus:border-ink/40 focus:outline-none focus:ring-2 focus:ring-ink/10"

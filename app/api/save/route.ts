@@ -73,11 +73,16 @@ export async function POST(req: Request) {
     allow_anonymous_storage: true,
     allow_content_use: allowContentUse === true,
     concept_image_url:
-      typeof conceptImageUrl === 'string' && conceptImageUrl.startsWith('http')
+      typeof conceptImageUrl === 'string' &&
+      (conceptImageUrl.startsWith('http') || conceptImageUrl.startsWith('/'))
         ? conceptImageUrl
         : null,
     concept_image_prompt:
       typeof conceptImagePrompt === 'string' ? conceptImagePrompt : null,
+    refined_success_metric:
+      typeof result.refinedSuccessMetric === 'string'
+        ? result.refinedSuccessMetric
+        : null,
   };
 
   try {

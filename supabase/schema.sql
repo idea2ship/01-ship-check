@@ -50,3 +50,8 @@ alter table ship_check_ideas
   add column if not exists feasibility int,
   add column if not exists mvp_keep text[],
   add column if not exists mvp_cut text[];
+
+-- Migration 3: LLM-refined success metric (a measurable rewrite of the
+-- user's success criteria). Idempotent — safe to re-run.
+alter table ship_check_ideas
+  add column if not exists refined_success_metric text;

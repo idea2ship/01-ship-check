@@ -55,6 +55,7 @@ const EVAL_LIMITS = {
   action: 36,
   actionCountMax: 3,
   imagePrompt: 240,
+  refinedSuccessMetric: 80,
 };
 
 function clampScore(value: unknown): number {
@@ -182,6 +183,10 @@ export function normalizeEvaluation(raw: unknown): EvaluationResult | null {
     imagePrompt:
       typeof r.imagePrompt === 'string'
         ? trunc(r.imagePrompt, EVAL_LIMITS.imagePrompt)
+        : '',
+    refinedSuccessMetric:
+      typeof r.refinedSuccessMetric === 'string'
+        ? trunc(r.refinedSuccessMetric.trim(), EVAL_LIMITS.refinedSuccessMetric)
         : '',
   };
 }
