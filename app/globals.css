@@ -141,35 +141,16 @@ body {
   color: #1a1a1a;
 }
 
-/* ---- Brand cursor ----
-   `/1>` mono glyph in mint-strong with a white halo so it stays legible on
-   both the cream background and the photographic bg image. The "+" variant
-   appears over interactive surfaces (links, buttons, the result card).
-   Hotspot sits at the top-left of the "/" so click feels anchored where the
-   pointer "tip" visually is. Native fallback (`auto` / `pointer`) keeps
-   pointing devices that reject SVG cursors working.
-
-   Coarse pointers (touch) get the native cursor — SVG cursors are
-   irrelevant there and would only add bytes. */
-@media (hover: hover) and (pointer: fine) {
-  body {
-    cursor: url('/cursor.svg') 2 3, auto;
-  }
-
-  a,
-  button,
-  summary,
-  label[for],
-  select,
-  [role='button'],
-  [contenteditable='true'] {
-    cursor: url('/cursor-pointer.svg') 2 3, pointer;
-  }
-
-  :disabled,
-  [aria-disabled='true'] {
-    cursor: url('/cursor.svg') 2 3, not-allowed;
-  }
+/* ---- Custom cursor ----
+   The CustomCursor component (mounted once in app/layout.tsx) sets the
+   `.has-custom-cursor` class on <html> after confirming the device has a
+   fine pointer + hover capability. The class hides the native OS cursor
+   everywhere so the mint dot + trailing ring read as the only pointer.
+   When the JS never runs (no-JS, SSR flash, touch device) the class never
+   appears and the OS cursor stays as a safe fallback. */
+.has-custom-cursor,
+.has-custom-cursor * {
+  cursor: none !important;
 }
 
 /* ---- Slot row underline + plus marker ----

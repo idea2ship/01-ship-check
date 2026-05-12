@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { BgLayer } from '@/components/BgLayer';
+import { CustomCursor } from '@/components/CustomCursor';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -40,6 +41,7 @@ export default function RootLayout({
         <BgLayer />
         <div className="bg-veil" aria-hidden />
         {children}
+        <CustomCursor />
       </body>
     </html>
   );
